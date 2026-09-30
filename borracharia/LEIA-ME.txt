@@ -1,0 +1,28 @@
+CONTROLE DE BORRACHARIA - COMO PUBLICAR NO FIREBASE (Windows)
+=============================================================
+
+1) Extraia este zip em C:\borracharia
+   (dentro de C:\borracharia devem ficar: firebase.json, firestore.rules, a pasta public...)
+
+2) Baixe a ferramenta do Firebase (nao precisa instalar nada):
+   https://firebase.tools/bin/win/instant/latest
+   Abra o arquivo baixado (firebase-tools-instant-win.exe).
+   Se o Windows avisar, clique em "Mais informacoes" > "Executar assim mesmo".
+   Vai abrir uma janela preta.
+
+3) Na janela preta, digite um comando por vez e aperte Enter:
+
+   cd C:\borracharia
+   firebase login
+      (abre o navegador: entre com a MESMA conta Google do projeto e clique em Permitir)
+   firebase deploy
+
+4) No final aparece:  Hosting URL: https://borracharia-albras.web.app
+   Esse e o endereco do app.
+
+5) No tablet: abra o endereco no Chrome, espere carregar,
+   toque no menu (tres pontinhos) > "Instalar app".
+   O app "Borracharia" aparece no menu de aplicativos.
+
+Para atualizar o app no futuro: substitua os arquivos e rode "firebase deploy" de novo.
+Senha inicial do controlador: a mesma combinada. Troque pelo botao "Senha" no painel.

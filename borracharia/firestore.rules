@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Trocas de pneu: o app cria; ninguém apaga pelo app
+    match /registros/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['tag', 'dataHora', 'borracheiro', 'saiu', 'entrou', 'criadoEm']);
+      // reenvio do mesmo registro (quando a internet oscila)
+      allow update: if request.auth != null
+        && resource.data.criadoEm == request.resource.data.criadoEm;
+      allow delete: if false;
+    }
+
+    // Senha do controlador (trocada pelo próprio app)
+    match /config/acesso {
+      allow read, write: if request.auth != null;
+    }
+
+    // Listas de equipamentos e borracheiros: só leitura pelo app (editar pelo console)
+    match /config/{outro} {
+      allow read: if request.auth != null;
+    }
+  }
+}

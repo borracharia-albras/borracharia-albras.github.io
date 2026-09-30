@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E47A1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Borracharia">
+<title>Controle de Borracharia</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>html,body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
+<style>
+/* Layout: tela única de totem (tablet) — cartões numerados empilhados, botões grandes para mão com luva, barra de status fixa embaixo */
+:root{
+  --bg:#EEF1F6; --surface:#FFFFFF; --ink:#16202E; --muted:#5B6778; --line:#C9D1DD;
+  --brand:#0E47A1; --brand-ink:#FFFFFF; --brand-soft:#E3ECFA;
+  --amarelo:#F9C02D; --amarelo-ink:#1B1400;
+  --ok:#1E7B34; --ok-bg:#E6F4EA; --erro:#B3261E; --erro-bg:#FCE8E6;
+  --barra:#0B2E6B; --barra-ink:#DCE6F7;
+  --f-corpo:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-titulo:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F141B; --surface:#18202B; --ink:#E7ECF3; --muted:#9AA6B6; --line:#2D3848;
+  --brand:#7FA8F0; --brand-ink:#0B1A33; --brand-soft:#1C2A42;
+  --amarelo:#E9B425; --amarelo-ink:#1B1400;
+  --ok:#6FCF87; --ok-bg:#173222; --erro:#F2A097; --erro-bg:#3A1D1B;
+  --barra:#0A1A36; --barra-ink:#C6D3EA; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F141B; --surface:#18202B; --ink:#E7ECF3; --muted:#9AA6B6; --line:#2D3848;
+  --brand:#7FA8F0; --brand-ink:#0B1A33; --brand-soft:#1C2A42;
+  --amarelo:#E9B425; --amarelo-ink:#1B1400;
+  --ok:#6FCF87; --ok-bg:#173222; --erro:#F2A097; --erro-bg:#3A1D1B;
+  --barra:#0A1A36; --barra-ink:#C6D3EA; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-corpo);font-size:17px;line-height:1.4}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--amarelo);outline-offset:2px}
+.app{max-width:960px;margin:0 auto;padding-inline:16px;padding-block:0 96px}
+
+/* topo */
+.topo{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line);
+  margin-inline:-16px;padding:10px 16px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px}
+.topo h1{margin:0;font-family:var(--f-titulo);font-size:24px;letter-spacing:.02em;text-transform:uppercase;text-align:center;line-height:1.1}
+.topo .quem{display:block;font-family:var(--f-corpo);font-size:14px;font-weight:600;color:var(--brand);letter-spacing:.03em;text-transform:uppercase}
+.icone-btn{min-width:48px;height:48px;border:1px solid var(--line);border-radius:10px;background:var(--surface);display:grid;place-items:center;padding:0 12px;font-weight:600;font-size:15px}
+.icone-btn svg{width:24px;height:24px}
+.vazio-48{width:48px}
+
+/* tela inicial */
+.inicio{min-height:calc(100vh - 140px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;text-align:center;padding-block:40px}
+.inicio svg.marca{width:92px;height:92px;color:var(--brand)}
+.inicio h2{margin:0;font-family:var(--f-titulo);font-size:34px;letter-spacing:.03em;text-transform:uppercase;text-wrap:balance}
+.inicio p{margin:0;color:var(--muted)}
+.btn-grande{display:flex;align-items:center;justify-content:center;gap:16px;min-height:96px;padding:18px 40px;border:0;border-radius:18px;background:var(--brand);color:var(--brand-ink);
+  font-family:var(--f-titulo);font-size:28px;letter-spacing:.03em;text-transform:uppercase;line-height:1.1;width:min(100%,520px)}
+.btn-grande svg{width:40px;height:40px;flex:none}
+.link-discreto{border:0;background:none;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:15px;padding:12px;display:inline-flex;gap:8px;align-items:center}
+.link-discreto svg{width:20px;height:20px}
+
+/* cartões */
+.cartao{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;margin-top:18px}
+.cartao.falta{border-color:var(--erro);box-shadow:0 0 0 2px var(--erro-bg)}
+.cartao h3{margin:0 0 16px;font-family:var(--f-titulo);font-size:22px;color:var(--brand);letter-spacing:.04em;text-transform:uppercase}
+.rotulo{display:block;font-size:14px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+.rotulo:first-of-type{margin-top:0}
+.rotulo .opc{font-weight:500;text-transform:none;letter-spacing:0}
+.campo{width:100%;min-height:60px;border:2px solid var(--line);border-radius:var(--r);background:var(--surface);padding:12px 16px;font-size:20px}
+.campo:focus{border-color:var(--brand);outline:none}
+textarea.campo{min-height:90px;font-size:18px;resize:vertical}
+.grade-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grade-2>*{min-width:0}
+.dica{font-size:14px;color:var(--muted);margin:6px 0 0}
+
+/* grupos de botões */
+.opcoes{display:flex;flex-wrap:wrap;gap:10px}
+.opcoes button{min-height:58px;min-width:80px;padding:10px 20px;border:2px solid var(--line);border-radius:var(--r);background:var(--surface);font-weight:600;font-size:18px;letter-spacing:.02em;text-transform:uppercase}
+.opcoes button[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.opcoes.num button{min-width:72px;font-size:22px;font-variant-numeric:tabular-nums}
+.btn-amarelo{min-height:52px;border:0;border-radius:10px;background:var(--amarelo);color:var(--amarelo-ink);font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:15px}
+
+/* busca de equipamento */
+.busca{position:relative}
+.busca svg{position:absolute;left:16px;top:50%;translate:0 -50%;width:26px;height:26px;color:var(--brand);pointer-events:none}
+.busca .campo{padding-left:56px;text-transform:uppercase}
+.resultados{display:grid;gap:8px;margin-top:10px}
+.resultados button{text-align:left;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:12px 16px;display:grid;grid-template-columns:auto 1fr;gap:2px 14px;align-items:baseline}
+.resultados b{font-family:var(--f-titulo);font-size:22px;letter-spacing:.02em}
+.resultados span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.resultados small{grid-column:2;color:var(--muted);font-size:14px}
+.equip-sel{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;background:var(--brand-soft);border-radius:var(--r);padding:14px 18px}
+.equip-sel .tag{font-family:var(--f-titulo);font-size:30px;letter-spacing:.02em}
+.equip-sel .desc{flex:1 1 220px;min-width:0}
+.equip-sel .desc strong{display:block}
+.equip-sel .desc small{color:var(--muted);font-size:15px}
+.chip{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:14px;font-weight:600}
+
+.sugestao{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding:12px 16px;border:1px dashed var(--brand);border-radius:var(--r);font-size:16px}
+.sugestao span{flex:1 1 240px;min-width:0}
+
+/* seções saiu/entrou */
+.par{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.par>section{min-width:0;border:1px solid var(--line);border-radius:14px;padding:18px}
+.par h4{margin:0 0 4px;font-family:var(--f-titulo);font-size:20px;letter-spacing:.04em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.par h4 svg{width:22px;height:22px}
+.saiu h4{color:var(--erro)} .entrou h4{color:var(--ok)}
+
+.duracao{margin-top:14px;padding:14px;border:2px solid var(--ok);background:var(--ok-bg);color:var(--ok);border-radius:var(--r);text-align:center;font-weight:700;font-size:20px}
+.pendencias{margin-top:18px;padding:16px 18px;border-radius:var(--r);background:var(--erro-bg);color:var(--erro);font-weight:600}
+.pendencias ul{margin:6px 0 0;padding-left:22px}
+.btn-salvar{margin-top:22px;width:100%;min-height:84px;border:0;border-radius:18px;background:var(--brand);color:var(--brand-ink);font-family:var(--f-titulo);font-size:30px;letter-spacing:.04em;text-transform:uppercase}
+.btn-salvar:disabled{opacity:.6}
+
+/* matrícula */
+.centro{max-width:520px;margin:0 auto;padding-block:32px;display:grid;gap:18px}
+.centro h2{margin:0;font-family:var(--f-titulo);font-size:30px;text-transform:uppercase;letter-spacing:.03em;text-align:center}
+.campo.grande{font-size:36px;text-align:center;letter-spacing:.2em;font-variant-numeric:tabular-nums;min-height:80px}
+.teclado{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.teclado button{min-height:72px;border:1px solid var(--line);border-radius:14px;background:var(--surface);font-size:30px;font-weight:600}
+.teclado button.acao{font-size:17px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.nome-encontrado{text-align:center;padding:16px;border-radius:var(--r);background:var(--ok-bg);color:var(--ok);font-size:22px;font-weight:700;min-height:64px}
+.nome-encontrado.erro{background:var(--erro-bg);color:var(--erro);font-size:18px}
+.nome-encontrado:empty{visibility:hidden}
+
+/* salvo */
+.salvo{text-align:center;display:grid;gap:18px;justify-items:center;padding-block:48px}
+.salvo .ok-icone{width:96px;height:96px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:grid;place-items:center}
+.salvo .ok-icone svg{width:56px;height:56px}
+.salvo h2{margin:0;font-family:var(--f-titulo);font-size:34px;text-transform:uppercase}
+.salvo p{margin:0;color:var(--muted);max-width:52ch}
+.linha-botoes{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;width:100%}
+.btn-sec{min-height:64px;padding:12px 28px;border:2px solid var(--brand);border-radius:14px;background:var(--surface);color:var(--brand);font-weight:700;font-size:18px;text-transform:uppercase;letter-spacing:.03em}
+
+/* controlador */
+.barra-busca{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:18px}
+.barra-busca .busca{flex:1 1 280px}
+.resumo{color:var(--muted);font-size:15px;margin:12px 2px 0}
+.lista-equip{display:grid;gap:10px;margin-top:12px}
+.lista-equip button{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 18px;display:grid;grid-template-columns:minmax(120px,auto) 1fr auto;gap:4px 18px;align-items:center}
+.lista-equip .tag{font-family:var(--f-titulo);font-size:26px}
+.lista-equip .meio{min-width:0}
+.lista-equip .meio strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lista-equip .meio small{color:var(--muted)}
+.lista-equip .dir{text-align:right;font-variant-numeric:tabular-nums}
+.lista-equip .dir b{display:block;font-size:22px;color:var(--brand)}
+.lista-equip .dir small{color:var(--muted);font-size:14px}
+.vazio{margin-top:18px;padding:28px;border:2px dashed var(--line);border-radius:18px;text-align:center;color:var(--muted)}
+
+.cab-equip{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline}
+.cab-equip .tag{font-family:var(--f-titulo);font-size:40px;line-height:1}
+.cab-equip .desc{font-size:19px;font-weight:600}
+.cab-equip .chips{display:flex;gap:8px;flex-wrap:wrap;width:100%}
+.registro{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 20px;margin-top:14px;display:grid;gap:14px}
+.registro .topo-reg{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;justify-content:space-between}
+.registro .quando{font-family:var(--f-titulo);font-size:24px;font-variant-numeric:tabular-nums}
+.registro .por{color:var(--muted);font-weight:600}
+.registro .pos{display:flex;gap:8px;flex-wrap:wrap}
+.registro .pos .chip{background:var(--brand-soft);border-color:transparent;color:var(--ink);font-size:15px}
+.registro .par section{padding:14px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:8px 0 0;font-size:16px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.selo{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.selo.novo{background:var(--ok-bg);color:var(--ok)}
+.selo.recap{background:var(--brand-soft);color:var(--brand)}
+.selo.pend{background:var(--amarelo);color:var(--amarelo-ink)}
+.detalhes{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:16px}
+.detalhes span b{color:var(--muted);font-weight:600;margin-right:4px}
+
+/* status */
+.status{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--barra);color:var(--barra-ink);display:flex;flex-wrap:wrap;gap:4px 18px;justify-content:space-between;align-items:center;
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;font-variant-numeric:tabular-nums}
+.status .est{display:flex;align-items:center;gap:8px}
+.status .ponto{width:10px;height:10px;border-radius:50%;background:#58D68D}
+.status.off .ponto{background:var(--amarelo)}
+.status .fila{color:var(--amarelo)}
+
+.aviso-topo{margin-top:14px;padding:12px 16px;border-radius:var(--r);background:var(--brand-soft);font-size:15px}
+.modal-fundo{position:fixed;inset:0;background:rgba(10,16,28,.55);display:grid;place-items:center;padding:16px;z-index:20}
+.modal{background:var(--surface);border-radius:18px;padding:24px;width:min(100%,460px);display:grid;gap:12px}
+.modal h3{margin:0;font-family:var(--f-titulo);font-size:24px;text-transform:uppercase;color:var(--brand)}
+.msg{font-weight:600;min-height:1.4em}
+.msg.erro{color:var(--erro)} .msg.ok{color:var(--ok)}
+
+@media (max-width:640px){
+  .par,.grade-2{grid-template-columns:1fr}
+  .lista-equip button{grid-template-columns:1fr auto}
+  .lista-equip .meio{grid-column:1/-1;grid-row:2}
+  .topo h1{font-size:19px}
+  .btn-grande{font-size:22px}
+}
+@media (prefers-reduced-motion:no-preference){.cartao,.registro{transition:border-color .2s}}
+</style>
+
+<div class="app" id="app">
+
+  <!-- TELA: INÍCIO -->
+  <section id="t-inicio">
+    <div class="inicio">
+      <svg class="marca" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" aria-hidden="true">
+        <circle cx="32" cy="32" r="27"/><circle cx="32" cy="32" r="16"/><circle cx="32" cy="32" r="5" fill="currentColor"/>
+        <path d="M32 5v7M32 52v7M5 32h7M52 32h7M12.9 12.9l5 5M46.1 46.1l5 5M12.9 51.1l5-5M46.1 17.9l5-5" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <h2>Controle de Borracharia</h2>
+        <p>Registro de troca de pneus</p>
+      </div>
+      <button class="btn-grande" id="b-iniciar">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="currentColor"/><path d="M16 12l12 8-12 8z" fill="var(--brand)"/></svg>
+        Iniciar registro<br>de troca
+      </button>
+      <button class="link-discreto" id="b-controlador">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        Entrar como controlador
+      </button>
+    </div>
+  </section>
+
+  <!-- TELA: MATRÍCULA -->
+  <section id="t-matricula" hidden>
+    <header class="topo">
+      <button class="icone-btn" data-voltar="inicio" aria-label="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h1>Identificação</h1><span class="vazio-48"></span>
+    </header>
+    <div class="centro">
+      <h2>Digite sua matrícula</h2>
+      <input class="campo grande" id="i-matricula" inputmode="numeric" autocomplete="off" maxlength="8" aria-label="Matrícula">
+      <div class="nome-encontrado" id="nome-encontrado" aria-live="polite"></div>
+      <div class="teclado" id="teclado">
+        <button>1</button><button>2</button><button>3</button>
+        <button>4</button><button>5</button><button>6</button>
+        <button>7</button><button>8</button><button>9</button>
+        <button class="acao" data-t="limpar">Limpar</button><button>0</button><button class="acao" data-t="apagar">Apagar</button>
+      </div>
+      <button class="btn-salvar" id="b-confirmar-mat" disabled>Confirmar</button>
+    </div>
+  </section>
+
+  <!-- TELA: REGISTRO -->
+  <section id="t-registro" hidden>
+    <header class="topo">
+      <button class="icone-btn" id="b-cancelar-reg" aria-label="Cancelar e sair"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h1>Registro de troca<span class="quem" id="quem-reg"></span></h1>
+      <span class="vazio-48"></span>
+    </header>
+
+    <div class="cartao" id="c-equip">
+      <h3>1. Qual o equipamento / TAG?</h3>
+      <div id="equip-busca">
+        <div class="busca">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg>
+          <input class="campo" id="i-tag" placeholder="Digite os 5 números da TAG" autocomplete="off" inputmode="text" aria-label="TAG do equipamento">
+        </div>
+        <div class="resultados" id="resultados"></div>
+      </div>
+      <div id="equip-escolhido" hidden></div>
+    </div>
+
+    <div class="cartao" id="c-posicao">
+      <h3>2. Posição do pneu</h3>
+      <span class="rotulo">Eixo</span>
+      <div class="opcoes num" data-campo="eixo">
+        <button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button><button data-v="6">6</button>
+      </div>
+      <span class="rotulo">Lado</span>
+      <div class="opcoes" data-campo="lado"><button data-v="Direito">Direito</button><button data-v="Esquerdo">Esquerdo</button></div>
+      <span class="rotulo">Posição <span class="opc">(deixe em branco se o eixo tem só um pneu de cada lado)</span></span>
+      <div class="opcoes" data-campo="posicao" data-opcional><button data-v="Interno">Interno</button><button data-v="Externo">Externo</button></div>
+      <div id="sugestao"></div>
+    </div>
+
+    <div class="cartao" id="c-pneus">
+      <h3>3. Pneus</h3>
+      <div class="par">
+        <section class="saiu">
+          <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Pneu que saiu</h4>
+          <label class="rotulo" for="i-saiu-serie">Nº de série</label>
+          <input class="campo" id="i-saiu-serie" autocomplete="off">
+          <label class="rotulo" for="i-saiu-tag">TAG do pneu <span class="opc">(opcional)</span></label>
+          <input class="campo" id="i-saiu-tag" autocomplete="off">
+          <span class="rotulo">Destino</span>
+          <div class="opcoes" data-campo="destino"><button data-v="Conserto">Conserto</button><button data-v="Recapagem">Recapagem</button><button data-v="Estoque">Estoque</button><button data-v="Sucata">Sucata</button></div>
+        </section>
+        <section class="entrou">
+          <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Pneu que entrou</h4>
+          <label class="rotulo" for="i-entrou-serie">Nº de série</label>
+          <input class="campo" id="i-entrou-serie" autocomplete="off">
+          <label class="rotulo" for="i-entrou-tag">TAG do pneu <span class="opc">(opcional)</span></label>
+          <input class="campo" id="i-entrou-tag" autocomplete="off">
+          <label class="rotulo" for="i-medida">Tipo de pneu (medida)</label>
+          <input class="campo" id="i-medida" list="medidas" placeholder="ex.: 295/80 R22.5" autocomplete="off">
+          <datalist id="medidas"></datalist>
+          <span class="rotulo">Condição</span>
+          <div class="opcoes" data-campo="condicao"><button data-v="Novo">Novo</button><button data-v="Recapado">Recapado</button></div>
+        </section>
+      </div>
+    </div>
+
+    <div class="cartao" id="c-motivo">
+      <h3>4. Motivo da troca</h3>
+      <div class="opcoes" data-campo="motivo">
+        <button data-v="Pneu furado">Furado</button><button data-v="Pneu careca">Careca</button><button data-v="Pneu com defeito">Com defeito</button><button data-v="Pneu estourado">Estourado</button><button data-v="Outro">Outro</button>
+      </div>
+      <div id="bloco-defeito" hidden>
+        <span class="rotulo">Qual defeito?</span>
+        <div class="opcoes" data-campo="defeito">
+          <button data-v="Bolha">Bolha</button><button data-v="Corte">Corte</button><button data-v="Dano no talão">Dano no talão</button><button data-v="Desgaste irregular">Desgaste irregular</button><button data-v="Separação da banda">Separação da banda</button><button data-v="Outro">Outro</button>
+        </div>
+      </div>
+      <div id="bloco-outro" hidden>
+        <label class="rotulo" for="i-outro">Descreva</label>
+        <input class="campo" id="i-outro" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="cartao" id="c-sap">
+      <h3>5. Leitura e dados SAP</h3>
+      <span class="rotulo">KM / horímetro <span class="opc">(opcional: só se o equipamento tiver)</span></span>
+      <div class="grade-2">
+        <div class="opcoes" data-campo="unidade" data-opcional><button data-v="KM">KM</button><button data-v="H">Horas</button></div>
+        <input class="campo" id="i-leitura" inputmode="decimal" placeholder="Leitura no painel" aria-label="Leitura do KM ou horímetro">
+      </div>
+      <label class="rotulo" for="i-om">Nº OM / nota <span class="opc">(opcional)</span></label>
+      <input class="campo" id="i-om" inputmode="numeric" autocomplete="off">
+      <label class="rotulo" for="i-obs">Observações <span class="opc">(opcional)</span></label>
+      <textarea class="campo" id="i-obs"></textarea>
+    </div>
+
+    <div class="cartao" id="c-hora">
+      <h3>6. Horário do serviço</h3>
+      <span class="rotulo">Hora de entrada (início)</span>
+      <div class="grade-2">
+        <input class="campo" type="date" id="i-data-ini" aria-label="Data de entrada">
+        <input class="campo" type="time" id="i-hora-ini" aria-label="Hora de entrada">
+      </div>
+      <div class="grade-2" style="margin-top:10px">
+        <button class="btn-amarelo" data-agora="ini">Agora</button>
+        <button class="btn-amarelo" data-menos1="ini">−1 hora</button>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:22px 0 0">
+      <span class="rotulo" style="margin-top:18px">Hora de saída (fim)</span>
+      <div class="grade-2">
+        <input class="campo" type="date" id="i-data-fim" aria-label="Data de saída">
+        <input class="campo" type="time" id="i-hora-fim" aria-label="Hora de saída">
+      </div>
+      <div class="grade-2" style="margin-top:10px">
+        <button class="btn-amarelo" data-agora="fim">Agora</button>
+        <button class="btn-amarelo" data-menos1="fim">−1 hora</button>
+      </div>
+      <div class="duracao" id="duracao">Duração: —</div>
+    </div>
+
+    <div id="pendencias"></div>
+    <button class="btn-salvar" id="b-salvar">Salvar registro</button>
+  </section>
+
+  <!-- TELA: SALVO -->
+  <section id="t-salvo" hidden>
+    <div class="salvo">
+      <div class="ok-icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <h2>Registro salvo</h2>
+      <p id="salvo-texto"></p>
+      <div class="linha-botoes">
+        <button class="btn-sec" id="b-outro-reg">Registrar outra troca</button>
+        <button class="btn-sec" id="b-sair-salvo">Sair</button>
+      </div>
+      <p id="salvo-contagem"></p>
+    </div>
+  </section>
+
+  <!-- TELA: SENHA -->
+  <section id="t-senha" hidden>
+    <header class="topo">
+      <button class="icone-btn" data-voltar="inicio" aria-label="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h1>Controlador</h1><span class="vazio-48"></span>
+    </header>
+    <form class="centro" id="f-senha">
+      <h2>Senha do controlador</h2>
+      <input class="campo grande" type="password" id="i-senha" autocomplete="current-password" aria-label="Senha" style="letter-spacing:.1em">
+      <div class="msg erro" id="msg-senha" aria-live="polite"></div>
+      <button class="btn-salvar" type="submit">Entrar</button>
+    </form>
+  </section>
+
+  <!-- TELA: CONTROLADOR -->
+  <section id="t-controle" hidden>
+    <header class="topo">
+      <button class="icone-btn" id="b-sair-ctrl" aria-label="Sair">Sair</button>
+      <h1>Painel do controlador<span class="quem">Trocas por equipamento</span></h1>
+      <button class="icone-btn" id="b-trocar-senha">Senha</button>
+    </header>
+    <div id="ctrl-lista">
+      <div class="barra-busca">
+        <div class="busca">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg>
+          <input class="campo" id="i-busca-ctrl" placeholder="Buscar TAG, equipamento ou área" autocomplete="off" aria-label="Buscar equipamento">
+        </div>
+      </div>
+      <p class="resumo" id="resumo-ctrl"></p>
+      <div class="lista-equip" id="lista-equip"></div>
+    </div>
+    <div id="ctrl-detalhe" hidden>
+      <div style="margin-top:16px"><button class="btn-sec" id="b-voltar-lista">← Todos os equipamentos</button></div>
+      <div id="detalhe-conteudo"></div>
+    </div>
+  </section>
+</div>
+
+<footer class="status" id="status">
+  <span class="est"><span class="ponto"></span><span id="st-texto">Conectando…</span></span>
+  <span id="st-sync">Última sincronização: —</span>
+  <span id="st-relogio"></span>
+</footer>
+
+<div class="modal-fundo" id="modal-senha" hidden>
+  <form class="modal" id="f-trocar">
+    <h3>Trocar senha</h3>
+    <label class="rotulo" for="i-senha-atual">Senha atual</label>
+    <input class="campo" type="password" id="i-senha-atual" autocomplete="current-password">
+    <label class="rotulo" for="i-senha-nova">Nova senha</label>
+    <input class="campo" type="password" id="i-senha-nova" autocomplete="new-password">
+    <label class="rotulo" for="i-senha-conf">Repita a nova senha</label>
+    <input class="campo" type="password" id="i-senha-conf" autocomplete="new-password">
+    <div class="msg" id="msg-trocar" aria-live="polite"></div>
+    <div class="linha-botoes">
+      <button type="button" class="btn-sec" id="b-fechar-modal">Cancelar</button>
+      <button type="submit" class="btn-sec" style="background:var(--brand);color:var(--brand-ink)">Salvar senha</button>
+    </div>
+  </form>
+</div>
+
+<script type="module" src="app.js"></script>
+<script>
+if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {})); }
+</script>
+</body>
+</html>
