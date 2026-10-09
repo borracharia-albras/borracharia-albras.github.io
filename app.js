@@ -85,6 +85,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
   /* ---------- navegação ---------- */
   const telas = ["inicio", "matricula", "registro", "salvo", "senha", "controle"];
   function ir(nome) {
+    if (nome === "inicio" && window.__appAtualizado) { location.reload(); return; }
     telas.forEach((t) => ($("#t-" + t).hidden = t !== nome));
     window.scrollTo(0, 0);
     if (nome !== "salvo" && timerSalvo) { clearInterval(timerSalvo); timerSalvo = null; }

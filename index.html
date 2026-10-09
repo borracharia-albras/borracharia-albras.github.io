@@ -408,9 +408,20 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
   </form>
 </div>
 
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=3"></script>
 <script>
-if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {})); }
+if ("serviceWorker" in navigator) {
+  const tinhaVersao = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!tinhaVersao) return;
+    // versão nova instalada: recarrega agora se estiver na tela inicial; senão, ao voltar para ela
+    const inicio = document.getElementById("t-inicio");
+    if (inicio && !inicio.hidden) location.reload(); else window.__appAtualizado = true;
+  });
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((r) => {
+    setInterval(() => r.update().catch(() => {}), 30 * 60 * 1000);
+  }).catch(() => {}));
+}
 </script>
 </body>
 </html>
