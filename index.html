@@ -11,7 +11,22 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<style>html,body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<style>html,body{margin:0}[hidden]{display:none!important}img{max-width:100%}
+/* v2: vários pneus por chamado */
+.contador{display:inline-block;margin-left:8px;padding:2px 12px;border-radius:999px;background:var(--brand);color:var(--brand-ink);font-size:16px;vertical-align:middle}
+.contador:empty{display:none}
+.pneu{border:2px solid var(--line);border-radius:16px;padding:18px;margin-top:18px}
+.pneu.falta{border-color:var(--erro);box-shadow:0 0 0 2px var(--erro-bg)}
+.pneu-cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding-bottom:12px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+.pneu-cab h4{margin:0;font-family:var(--f-titulo);font-size:24px;letter-spacing:.03em;text-transform:uppercase}
+.pneu-cab .resumo-pos{flex:1 1 160px;min-width:0;color:var(--muted);font-weight:600}
+.btn-remover{min-height:44px;padding:0 16px;border:1px solid var(--erro);border-radius:10px;background:var(--surface);color:var(--erro);font-weight:700;text-transform:uppercase;font-size:14px;letter-spacing:.04em}
+.btn-adicionar{margin-top:18px;width:100%;min-height:68px;border:2px dashed var(--brand);border-radius:16px;background:var(--brand-soft);color:var(--brand);font-family:var(--f-titulo);font-size:24px;letter-spacing:.04em;text-transform:uppercase}
+.par-motivo{margin-top:4px}
+.chamado-pneu{border-top:1px solid var(--line);padding-top:14px;display:grid;gap:12px}
+.chamado-pneu:first-of-type{border-top:0;padding-top:0}
+.chamado-pneu .np{font-family:var(--f-titulo);font-size:19px;text-transform:uppercase;letter-spacing:.03em;color:var(--brand)}
+</style>
 </head>
 <body>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -266,78 +281,27 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
       <div id="equip-escolhido" hidden></div>
     </div>
 
-    <div class="cartao" id="c-posicao">
-      <h3>2. Posição do pneu</h3>
-      <span class="rotulo">Eixo</span>
-      <div class="opcoes num" data-campo="eixo">
-        <button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button><button data-v="6">6</button>
-      </div>
-      <span class="rotulo">Lado</span>
-      <div class="opcoes" data-campo="lado"><button data-v="Direito">Direito</button><button data-v="Esquerdo">Esquerdo</button></div>
-      <span class="rotulo">Posição <span class="opc">(deixe em branco se o eixo tem só um pneu de cada lado)</span></span>
-      <div class="opcoes" data-campo="posicao" data-opcional><button data-v="Interno">Interno</button><button data-v="Externo">Externo</button></div>
-      <div id="sugestao"></div>
-    </div>
-
-    <div class="cartao" id="c-pneus">
-      <h3>3. Pneus</h3>
-      <div class="par">
-        <section class="saiu">
-          <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Pneu que saiu</h4>
-          <label class="rotulo" for="i-saiu-serie">Nº de série</label>
-          <input class="campo" id="i-saiu-serie" autocomplete="off">
-          <label class="rotulo" for="i-saiu-tag">TAG do pneu <span class="opc">(opcional)</span></label>
-          <input class="campo" id="i-saiu-tag" autocomplete="off">
-          <span class="rotulo">Destino</span>
-          <div class="opcoes" data-campo="destino"><button data-v="Conserto">Conserto</button><button data-v="Recapagem">Recapagem</button><button data-v="Estoque">Estoque</button><button data-v="Sucata">Sucata</button></div>
-        </section>
-        <section class="entrou">
-          <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Pneu que entrou</h4>
-          <label class="rotulo" for="i-entrou-serie">Nº de série</label>
-          <input class="campo" id="i-entrou-serie" autocomplete="off">
-          <label class="rotulo" for="i-entrou-tag">TAG do pneu <span class="opc">(opcional)</span></label>
-          <input class="campo" id="i-entrou-tag" autocomplete="off">
-          <label class="rotulo" for="i-medida">Tipo de pneu (medida)</label>
-          <input class="campo" id="i-medida" list="medidas" placeholder="ex.: 295/80 R22.5" autocomplete="off">
-          <datalist id="medidas"></datalist>
-          <span class="rotulo">Condição</span>
-          <div class="opcoes" data-campo="condicao"><button data-v="Novo">Novo</button><button data-v="Recapado">Recapado</button></div>
-        </section>
-      </div>
-    </div>
-
-    <div class="cartao" id="c-motivo">
-      <h3>4. Motivo da troca</h3>
-      <div class="opcoes" data-campo="motivo">
-        <button data-v="Pneu furado">Furado</button><button data-v="Pneu careca">Careca</button><button data-v="Pneu com defeito">Com defeito</button><button data-v="Pneu estourado">Estourado</button><button data-v="Outro">Outro</button>
-      </div>
-      <div id="bloco-defeito" hidden>
-        <span class="rotulo">Qual defeito?</span>
-        <div class="opcoes" data-campo="defeito">
-          <button data-v="Bolha">Bolha</button><button data-v="Corte">Corte</button><button data-v="Dano no talão">Dano no talão</button><button data-v="Desgaste irregular">Desgaste irregular</button><button data-v="Separação da banda">Separação da banda</button><button data-v="Outro">Outro</button>
-        </div>
-      </div>
-      <div id="bloco-outro" hidden>
-        <label class="rotulo" for="i-outro">Descreva</label>
-        <input class="campo" id="i-outro" autocomplete="off">
-      </div>
-    </div>
-
-    <div class="cartao" id="c-sap">
-      <h3>5. Leitura e dados SAP</h3>
+    <div class="cartao" id="c-chamado">
+      <h3>2. Dados do chamado</h3>
+      <label class="rotulo" for="i-om">Nº OM / nota</label>
+      <input class="campo" id="i-om" inputmode="numeric" autocomplete="off">
       <span class="rotulo">KM / horímetro <span class="opc">(opcional: só se o equipamento tiver)</span></span>
       <div class="grade-2">
         <div class="opcoes" data-campo="unidade" data-opcional><button data-v="KM">KM</button><button data-v="H">Horas</button></div>
         <input class="campo" id="i-leitura" inputmode="decimal" placeholder="Leitura no painel" aria-label="Leitura do KM ou horímetro">
       </div>
-      <label class="rotulo" for="i-om">Nº OM / nota <span class="opc">(opcional)</span></label>
-      <input class="campo" id="i-om" inputmode="numeric" autocomplete="off">
-      <label class="rotulo" for="i-obs">Observações <span class="opc">(opcional)</span></label>
-      <textarea class="campo" id="i-obs"></textarea>
+    </div>
+
+    <div class="cartao" id="c-pneus">
+      <h3>3. Pneus trocados <span class="contador" id="contador-pneus"></span></h3>
+      <p class="dica" style="margin:-8px 0 0">Trocou mais de um pneu neste chamado? Preencha o primeiro e toque em “Adicionar outro pneu”. TAG, OM e horário valem para todos.</p>
+      <div id="lista-pneus"></div>
+      <button class="btn-adicionar" id="b-add-pneu">+ Adicionar outro pneu</button>
+      <datalist id="medidas"></datalist>
     </div>
 
     <div class="cartao" id="c-hora">
-      <h3>6. Horário do serviço</h3>
+      <h3>4. Horário do serviço</h3>
       <span class="rotulo">Hora de entrada (início)</span>
       <div class="grade-2">
         <input class="campo" type="date" id="i-data-ini" aria-label="Data de entrada">
@@ -358,6 +322,11 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
         <button class="btn-amarelo" data-menos1="fim">−1 hora</button>
       </div>
       <div class="duracao" id="duracao">Duração: —</div>
+    </div>
+
+    <div class="cartao" id="c-obs">
+      <h3>5. Observações <span class="opc" style="font-family:var(--f-corpo);font-size:15px;text-transform:none;letter-spacing:0;color:var(--muted)">(opcional)</span></h3>
+      <textarea class="campo" id="i-obs" aria-label="Observações"></textarea>
     </div>
 
     <div id="pendencias"></div>
@@ -403,7 +372,7 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
       <div class="barra-busca">
         <div class="busca">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg>
-          <input class="campo" id="i-busca-ctrl" placeholder="Buscar TAG, equipamento ou área" autocomplete="off" aria-label="Buscar equipamento">
+          <input class="campo" id="i-busca-ctrl" placeholder="Buscar TAG, equipamento, área ou OM" autocomplete="off" aria-label="Buscar equipamento">
         </div>
       </div>
       <p class="resumo" id="resumo-ctrl"></p>
