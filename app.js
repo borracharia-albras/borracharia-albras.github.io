@@ -231,7 +231,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     condicao: [["Novo", "Novo"], ["Recapado", "Recapado"]],
     saiuCondicao: [["Novo", "Novo"], ["Recapado", "Recapado"]],
     recapagens: [["0", "0 · Novo"], ["1", "1ª"], ["2", "2ª"], ["3", "3ª"], ["4", "4ª"], ["5", "5ª"], ["6", "6ª"], ["7", "7ª"], ["8", "8ª"], ["9", "9ª"], ["10", "10ª"]],
-    saiuRecapagens: [["0", "0 · Novo"], ["1", "1ª"], ["2", "2ª"], ["3", "3ª"], ["4", "4ª"], ["5", "5ª"], ["6", "6ª"], ["7", "7ª"], ["8", "8ª"], ["9", "9ª"], ["10", "10ª"]],
+    saiuRecapagens: [["0", "0"], ["1", "1ª"], ["2", "2ª"], ["3", "3ª"], ["4", "4ª"], ["5", "5ª"], ["6", "6ª"], ["7", "7ª"], ["8", "8ª"], ["9", "9ª"], ["10", "10ª"]],
     motivo: [["Pneu furado", "Furado"], ["Pneu careca", "Careca"], ["Pneu com defeito", "Com defeito"], ["Pneu estourado", "Estourado"], ["Outro", "Outro"]],
     defeito: [["Bolha", "Bolha"], ["Corte", "Corte"], ["Dano no talão", "Dano no talão"], ["Desgaste irregular", "Desgaste irregular"], ["Separação da banda", "Separação da banda"], ["Outro", "Outro"]]
   };
@@ -270,7 +270,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
         '<section class="saiu"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Pneu que saiu</h4>' +
           '<span class="rotulo">Nº de série</span>' + entrada("saiuSerie", p.saiuSerie, "Nº de série do pneu que saiu") +
           '<span class="rotulo">TAG do pneu <span class="opc">(opcional)</span></span>' + entrada("saiuTag", p.saiuTag, "TAG do pneu que saiu") +
-          '<span class="rotulo">Recapagens <span class="opc">(0 = pneu novo)</span></span>' + grupo("saiuRecapagens", p.saiuRecapagens) +
+          '<span class="rotulo">Recapagens <span class="opc">(0 = nunca foi recapado)</span></span>' + grupo("saiuRecapagens", p.saiuRecapagens) +
           '<span class="rotulo">Destino</span>' + grupo("destino", p.destino) +
         "</section>" +
         '<section class="entrou"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Pneu que entrou</h4>' +
@@ -298,7 +298,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const usar = e.target.closest('[data-acao="usar-sug"]');
     if (usar) {
       p.saiuSerie = usar.dataset.serie; if (usar.dataset.tag) p.saiuTag = usar.dataset.tag;
-      if (usar.dataset.cond === "Novo") { p.saiuCondicao = "Novo"; p.saiuRecapagens = "0"; }
+      if (usar.dataset.cond === "Novo") { p.saiuCondicao = "Sem recapagem"; p.saiuRecapagens = "0"; }
       else if (usar.dataset.cond === "Recapado" && usar.dataset.recap) { p.saiuCondicao = "Recapado"; p.saiuRecapagens = usar.dataset.recap; }
       renderPneu(i); return;
     }
@@ -308,7 +308,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     if (campo === "motivo" && p.motivo !== "Pneu com defeito") p.defeito = null;
     const cond = (v) => (v === null || v === undefined ? null : String(v) === "0" ? "Novo" : "Recapado");
     if (campo === "recapagens") p.condicao = cond(p.recapagens);
-    if (campo === "saiuRecapagens") p.saiuCondicao = cond(p.saiuRecapagens);
+    if (campo === "saiuRecapagens") p.saiuCondicao = p.saiuRecapagens === null ? null : String(p.saiuRecapagens) === "0" ? "Sem recapagem" : "Recapado";
     renderPneu(i);
   });
   $("#lista-pneus").addEventListener("input", (e) => {
@@ -401,7 +401,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
       if (!p.eixo) add(alvo, n + "escolha o eixo");
       if (!p.lado) add(alvo, n + "escolha o lado (direito ou esquerdo)");
       if (!p.saiuSerie.trim()) add(alvo, n + "nº de série do pneu que saiu");
-      if (p.saiuRecapagens === null || p.saiuRecapagens === undefined) add(alvo, n + "recapagens do pneu que saiu (0 se era novo)");
+      if (p.saiuRecapagens === null || p.saiuRecapagens === undefined) add(alvo, n + "recapagens do pneu que saiu (0 se nunca foi recapado)");
       if (!p.destino) add(alvo, n + "destino do pneu que saiu");
       if (!p.entrouSerie.trim()) add(alvo, n + "nº de série do pneu que entrou");
       if (!p.medida.trim()) add(alvo, n + "tipo (medida) do pneu que entrou");
@@ -609,7 +609,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
       return '<div class="chamado-pneu">' +
         (g.length > 1 ? '<span class="np">Pneu ' + (x.pneuNumero || "") + "</span>" : "") +
         '<div class="pos"><span class="chip">Eixo ' + esc(p.eixo) + '</span><span class="chip">' + esc(p.lado) + "</span>" + (p.posicao ? '<span class="chip">' + esc(p.posicao) + "</span>" : "") + '<span class="chip">' + esc(motivo) + "</span></div>" +
-        '<div class="par"><section class="saiu"><h4>Saiu ' + (x.saiu.condicao ? textoCondicao(x.saiu) : "") + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.saiu.serie) + "</dd>" + (x.saiu.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.saiu.tagPneu) + "</dd>" : "") + "<dt>Destino</dt><dd>" + esc(x.saiu.destino) + "</dd></dl></section>" +
+        '<div class="par"><section class="saiu"><h4>Saiu ' + textoSaiu(x.saiu) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.saiu.serie) + "</dd>" + (x.saiu.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.saiu.tagPneu) + "</dd>" : "") + "<dt>Destino</dt><dd>" + esc(x.saiu.destino) + "</dd></dl></section>" +
         '<section class="entrou"><h4>Entrou ' + textoCondicao(x.entrou) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.entrou.serie) + "</dd>" + (x.entrou.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.entrou.tagPneu) + "</dd>" : "") + "<dt>Medida</dt><dd>" + esc(x.entrou.medida) + "</dd></dl></section></div></div>";
     }).join("");
     return '<article class="registro">' +
@@ -664,6 +664,11 @@ function conectarFirebase(aoConectar, aoFalhar) {
   });
   $("#b-voltar-lista").addEventListener("click", () => { tagAberta = null; $("#ctrl-lista").hidden = false; $("#ctrl-detalhe").hidden = true; renderCtrl(); });
 
+  function textoSaiu(sa) {
+    if (!sa || (sa.recapagens === null || sa.recapagens === undefined) && !sa.condicao) return "";
+    const n = sa.recapagens || 0;
+    return '<span class="selo recap">' + (n ? n + "ª recapagem" : "0 recapagem") + "</span>";
+  }
   function textoCondicao(en) {
     if (en.condicao === "Novo") return '<span class="selo novo">Novo</span>';
     return '<span class="selo recap">Recapado' + (en.recapagens ? " · " + en.recapagens + "ª recapagem" : "") + "</span>";
