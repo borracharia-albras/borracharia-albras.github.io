@@ -42,6 +42,11 @@
 .equip-link{justify-self:start;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;border:0;background:var(--brand-soft);border-radius:10px;padding:8px 14px;text-align:left;max-width:100%}
 .equip-link b{font-family:var(--f-titulo);font-size:24px}
 .equip-link span{color:var(--muted);font-weight:600;min-width:0}
+
+/* v6: até 16 eixos */
+.opcoes.eixos{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}
+.opcoes.eixos button{min-width:0;padding:8px 0}
+@media (max-width:640px){.opcoes.eixos{grid-template-columns:repeat(4,minmax(0,1fr))}}
 </style>
 </head>
 <body>
@@ -438,7 +443,7 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
   </form>
 </div>
 
-<script type="module" src="app.js?v=4"></script>
+<script type="module" src="app.js?v=6"></script>
 <script>
 if ("serviceWorker" in navigator) {
   const tinhaVersao = !!navigator.serviceWorker.controller;

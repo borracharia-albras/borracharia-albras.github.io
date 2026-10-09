@@ -188,7 +188,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
   let F = {};
   let pneus = [];
   let historicoTag = [];
-  const novoPneu = (ant) => ({ eixo: null, lado: null, posicao: null, saiuSerie: "", saiuTag: "", destino: null,
+  const novoPneu = (ant) => ({ eixo: null, lado: null, posicao: null, saiuSerie: "", saiuTag: "", saiuCondicao: null, saiuRecapagens: null, destino: null,
     entrouSerie: "", entrouTag: "", medida: ant ? ant.medida : "", condicao: null, recapagens: null,
     motivo: null, defeito: null, outro: "" });
 
@@ -224,17 +224,19 @@ function conectarFirebase(aoConectar, aoFalhar) {
 
   /* cartões de pneu */
   const OP = {
-    eixo: [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"]],
+    eixo: Array.from({ length: 16 }, (_, k) => [String(k + 1), String(k + 1)]),
     lado: [["Direito", "Direito"], ["Esquerdo", "Esquerdo"]],
     posicao: [["Interno", "Interno"], ["Externo", "Externo"]],
     destino: [["Conserto", "Conserto"], ["Recapagem", "Recapagem"], ["Estoque", "Estoque"], ["Sucata", "Sucata"]],
     condicao: [["Novo", "Novo"], ["Recapado", "Recapado"]],
+    saiuCondicao: [["Novo", "Novo"], ["Recapado", "Recapado"]],
     recapagens: [["1", "1ª"], ["2", "2ª"], ["3", "3ª"], ["4", "4ª"], ["5", "5ª"], ["6", "6ª"], ["7", "7ª"], ["8", "8ª"], ["9", "9ª"], ["10", "10ª"]],
+    saiuRecapagens: [["1", "1ª"], ["2", "2ª"], ["3", "3ª"], ["4", "4ª"], ["5", "5ª"], ["6", "6ª"], ["7", "7ª"], ["8", "8ª"], ["9", "9ª"], ["10", "10ª"]],
     motivo: [["Pneu furado", "Furado"], ["Pneu careca", "Careca"], ["Pneu com defeito", "Com defeito"], ["Pneu estourado", "Estourado"], ["Outro", "Outro"]],
     defeito: [["Bolha", "Bolha"], ["Corte", "Corte"], ["Dano no talão", "Dano no talão"], ["Desgaste irregular", "Desgaste irregular"], ["Separação da banda", "Separação da banda"], ["Outro", "Outro"]]
   };
   function grupo(campo, valor, extra) {
-    return '<div class="opcoes' + (campo === "eixo" || campo === "recapagens" ? " num" : "") + '" data-pcampo="' + campo + '"' + (extra || "") + ">" +
+    return '<div class="opcoes' + (campo === "eixo" ? " num eixos" : campo === "recapagens" || campo === "saiuRecapagens" ? " num" : "") + '" data-pcampo="' + campo + '"' + (extra || "") + ">" +
       OP[campo].map(([v, l]) => '<button data-v="' + esc(v) + '" aria-pressed="' + (String(valor) === v) + '">' + esc(l) + "</button>").join("") + "</div>";
   }
   function entrada(campo, valor, rotulo, extra) {
@@ -254,7 +256,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
   function htmlPneu(p, i) {
     const u = sugestaoPara(p);
     const sug = u && norm(p.saiuSerie) !== norm(u.entrou.serie)
-      ? '<div class="sugestao"><span>Último pneu montado nesta posição: <b>série ' + esc(u.entrou.serie) + "</b>" + (u.entrou.tagPneu ? " (TAG " + esc(u.entrou.tagPneu) + ")" : "") + ", em " + esc(fmtData(u.dataServico)) + '.</span><button class="btn-amarelo" style="padding:0 18px" data-acao="usar-sug" data-serie="' + esc(u.entrou.serie) + '" data-tag="' + esc(u.entrou.tagPneu || "") + '">Usar no pneu que saiu</button></div>'
+      ? '<div class="sugestao"><span>Último pneu montado nesta posição: <b>série ' + esc(u.entrou.serie) + "</b>" + (u.entrou.tagPneu ? " (TAG " + esc(u.entrou.tagPneu) + ")" : "") + ", em " + esc(fmtData(u.dataServico)) + '.</span><button class="btn-amarelo" style="padding:0 18px" data-acao="usar-sug" data-serie="' + esc(u.entrou.serie) + '" data-tag="' + esc(u.entrou.tagPneu || "") + '" data-cond="' + esc(u.entrou.condicao || "") + '" data-recap="' + esc(u.entrou.recapagens || "") + '">Usar no pneu que saiu</button></div>'
       : "";
     const precisaTexto = p.motivo === "Outro" || (p.motivo === "Pneu com defeito" && p.defeito === "Outro");
     return '<article class="pneu" id="pneu-' + i + '" data-idx="' + i + '">' +
@@ -268,6 +270,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
         '<section class="saiu"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Pneu que saiu</h4>' +
           '<span class="rotulo">Nº de série</span>' + entrada("saiuSerie", p.saiuSerie, "Nº de série do pneu que saiu") +
           '<span class="rotulo">TAG do pneu <span class="opc">(opcional)</span></span>' + entrada("saiuTag", p.saiuTag, "TAG do pneu que saiu") +
+          '<span class="rotulo">Condição</span>' + grupo("saiuCondicao", p.saiuCondicao) +
+          (p.saiuCondicao === "Recapado" ? '<span class="rotulo">Quantas recapagens?</span>' + grupo("saiuRecapagens", p.saiuRecapagens) : "") +
           '<span class="rotulo">Destino</span>' + grupo("destino", p.destino) +
         "</section>" +
         '<section class="entrou"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Pneu que entrou</h4>' +
@@ -294,12 +298,17 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const i = +card.dataset.idx, p = pneus[i];
     if (e.target.closest('[data-acao="remover"]')) { pneus.splice(i, 1); renderPneus(); return; }
     const usar = e.target.closest('[data-acao="usar-sug"]');
-    if (usar) { p.saiuSerie = usar.dataset.serie; if (usar.dataset.tag) p.saiuTag = usar.dataset.tag; renderPneu(i); return; }
+    if (usar) {
+      p.saiuSerie = usar.dataset.serie; if (usar.dataset.tag) p.saiuTag = usar.dataset.tag;
+      if (usar.dataset.cond) { p.saiuCondicao = usar.dataset.cond; p.saiuRecapagens = usar.dataset.cond === "Recapado" && usar.dataset.recap ? usar.dataset.recap : null; }
+      renderPneu(i); return;
+    }
     const b = e.target.closest(".opcoes button"); if (!b) return;
     const g = b.closest("[data-pcampo]"), campo = g.dataset.pcampo;
     p[campo] = (String(p[campo]) === b.dataset.v && g.hasAttribute("data-opcional")) ? null : b.dataset.v;
     if (campo === "motivo" && p.motivo !== "Pneu com defeito") p.defeito = null;
     if (campo === "condicao" && p.condicao !== "Recapado") p.recapagens = null;
+    if (campo === "saiuCondicao" && p.saiuCondicao !== "Recapado") p.saiuRecapagens = null;
     renderPneu(i);
   });
   $("#lista-pneus").addEventListener("input", (e) => {
@@ -392,6 +401,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
       if (!p.eixo) add(alvo, n + "escolha o eixo");
       if (!p.lado) add(alvo, n + "escolha o lado (direito ou esquerdo)");
       if (!p.saiuSerie.trim()) add(alvo, n + "nº de série do pneu que saiu");
+      if (!p.saiuCondicao) add(alvo, n + "condição do pneu que saiu (novo ou recapado)");
+      if (p.saiuCondicao === "Recapado" && !p.saiuRecapagens) add(alvo, n + "quantas recapagens o pneu que saiu tinha");
       if (!p.destino) add(alvo, n + "destino do pneu que saiu");
       if (!p.entrouSerie.trim()) add(alvo, n + "nº de série do pneu que entrou");
       if (!p.medida.trim()) add(alvo, n + "tipo (medida) do pneu que entrou");
@@ -457,7 +468,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
       return Object.assign({}, comum, {
         pneuNumero: k + 1,
         posicao: { eixo: Number(p.eixo), lado: p.lado, posicao: p.posicao || null },
-        saiu: { serie: p.saiuSerie.trim().toUpperCase(), tagPneu: p.saiuTag.trim().toUpperCase(), destino: p.destino },
+        saiu: { serie: p.saiuSerie.trim().toUpperCase(), tagPneu: p.saiuTag.trim().toUpperCase(), destino: p.destino,
+          condicao: p.saiuCondicao, recapagens: p.saiuCondicao === "Recapado" ? Number(p.saiuRecapagens) : null },
         entrou: { serie: p.entrouSerie.trim().toUpperCase(), tagPneu: p.entrouTag.trim().toUpperCase(), medida, condicao: p.condicao,
           recapagens: p.condicao === "Recapado" ? Number(p.recapagens) : null },
         motivo: p.motivo,
@@ -599,7 +611,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
       return '<div class="chamado-pneu">' +
         (g.length > 1 ? '<span class="np">Pneu ' + (x.pneuNumero || "") + "</span>" : "") +
         '<div class="pos"><span class="chip">Eixo ' + esc(p.eixo) + '</span><span class="chip">' + esc(p.lado) + "</span>" + (p.posicao ? '<span class="chip">' + esc(p.posicao) + "</span>" : "") + '<span class="chip">' + esc(motivo) + "</span></div>" +
-        '<div class="par"><section class="saiu"><h4>Saiu</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.saiu.serie) + "</dd>" + (x.saiu.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.saiu.tagPneu) + "</dd>" : "") + "<dt>Destino</dt><dd>" + esc(x.saiu.destino) + "</dd></dl></section>" +
+        '<div class="par"><section class="saiu"><h4>Saiu ' + (x.saiu.condicao ? textoCondicao(x.saiu) : "") + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.saiu.serie) + "</dd>" + (x.saiu.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.saiu.tagPneu) + "</dd>" : "") + "<dt>Destino</dt><dd>" + esc(x.saiu.destino) + "</dd></dl></section>" +
         '<section class="entrou"><h4>Entrou ' + textoCondicao(x.entrou) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.entrou.serie) + "</dd>" + (x.entrou.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.entrou.tagPneu) + "</dd>" : "") + "<dt>Medida</dt><dd>" + esc(x.entrou.medida) + "</dd></dl></section></div></div>";
     }).join("");
     return '<article class="registro">' +
