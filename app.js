@@ -229,7 +229,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     posicao: [["Interno", "Interno"], ["Externo", "Externo"]],
     destino: [["Conserto", "Conserto"], ["Recapagem", "Recapagem"], ["Estoque", "Estoque"], ["Sucata", "Sucata"]],
     condicao: [["Novo", "Novo"], ["Recapado", "Recapado"]],
-    recapagens: [["1", "1ª"], ["2", "2ª"], ["3", "3ª"], ["4", "4ª ou mais"]],
+    recapagens: [["1", "1ª"], ["2", "2ª"], ["3", "3ª"], ["4", "4ª"], ["5", "5ª"], ["6", "6ª"], ["7", "7ª"], ["8", "8ª"], ["9", "9ª"], ["10", "10ª"]],
     motivo: [["Pneu furado", "Furado"], ["Pneu careca", "Careca"], ["Pneu com defeito", "Com defeito"], ["Pneu estourado", "Estourado"], ["Outro", "Outro"]],
     defeito: [["Bolha", "Bolha"], ["Corte", "Corte"], ["Dano no talão", "Dano no talão"], ["Desgaste irregular", "Desgaste irregular"], ["Separação da banda", "Separação da banda"], ["Outro", "Outro"]]
   };
@@ -522,79 +522,152 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const pend = fila.filter((f) => !ids.has(f.id)).map((f) => Object.assign({ _id: f.id, _pendente: true }, f.data));
     return pend.concat(registrosCtrl).sort((a, b) => String(b.dataHora).localeCompare(String(a.dataHora)));
   }
+  /* histórico: por data ou por equipamento */
+  let vistaCtrl = "data";
+  let periodo = "30";
+  function intervalo() {
+    if (periodo === "tudo") return [null, null];
+    if (periodo === "custom") return [$("#i-de").value || null, $("#i-ate").value || null];
+    const d = new Date(); d.setDate(d.getDate() - (periodo === "hoje" ? 0 : Number(periodo) - 1));
+    return [hojeISO(d), hojeISO()];
+  }
+  function setPeriodo(p) {
+    periodo = p;
+    $$("#periodos button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.p === p)));
+    if (p !== "custom") { const [de, ate] = intervalo(); $("#i-de").value = de || ""; $("#i-ate").value = ate || ""; }
+    renderCtrl();
+  }
+  $("#periodos").addEventListener("click", (e) => { const b = e.target.closest("button[data-p]"); if (b) setPeriodo(b.dataset.p); });
+  ["#i-de", "#i-ate"].forEach((s) => $(s).addEventListener("change", () => setPeriodo("custom")));
+  $("#abas-ctrl").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-vista]"); if (!b) return;
+    vistaCtrl = b.dataset.vista;
+    $$("#abas-ctrl button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    renderCtrl();
+  });
+
+  function bateBusca(r, q) {
+    if (!q) return true;
+    const e = r.equipamento || {};
+    return [r.tag, e.descricao, e.area, e.familia, r.om, r.borracheiro && r.borracheiro.nome, r.saiu && r.saiu.serie, r.entrou && r.entrou.serie, r.saiu && r.saiu.tagPneu, r.entrou && r.entrou.tagPneu]
+      .some((v) => norm(v).includes(q));
+  }
+  function agruparChamados(rs) {
+    const m = new Map();
+    rs.forEach((r) => { const k = r.chamadoId || r._id; if (!m.has(k)) m.set(k, []); m.get(k).push(r); });
+    return Array.from(m.values()).sort((a, b) => String(b[0].dataHora).localeCompare(String(a[0].dataHora)));
+  }
+  function rotuloDia(iso) {
+    if (!iso) return "Sem data";
+    const hoje = hojeISO(); const o = new Date(); o.setDate(o.getDate() - 1);
+    if (iso === hoje) return "Hoje · " + fmtData(iso);
+    if (iso === hojeISO(o)) return "Ontem · " + fmtData(iso);
+    const [y, m, d] = iso.split("-").map(Number);
+    const sem = new Date(y, m - 1, d).toLocaleDateString("pt-BR", { weekday: "long" });
+    return sem.charAt(0).toUpperCase() + sem.slice(1) + " · " + fmtData(iso);
+  }
+  const plural = (n, um, varios) => n + " " + (n === 1 ? um : varios);
+  function htmlDias(rs, mostrarEquip) {
+    const chamados = agruparChamados(rs);
+    const dias = new Map();
+    chamados.forEach((g) => { const k = g[0].dataServico || ""; if (!dias.has(k)) dias.set(k, []); dias.get(k).push(g); });
+    return Array.from(dias.entries()).map(([dia, gs]) => {
+      const pneusDia = gs.reduce((s, g) => s + g.length, 0);
+      return '<section class="dia"><h3 class="dia-cab"><span>' + esc(rotuloDia(dia)) + "</span><small>" + plural(gs.length, "chamado", "chamados") + " · " + plural(pneusDia, "pneu", "pneus") + "</small></h3>" +
+        gs.map((g) => htmlChamado(g, mostrarEquip)).join("") + "</section>";
+    }).join("");
+  }
+  function htmlChamado(g, mostrarEquip) {
+    g.sort((a, b) => (a.pneuNumero || 0) - (b.pneuNumero || 0));
+    const r = g[0];
+    const e = equip.find((x) => x.tag === r.tag) || r.equipamento || { tag: r.tag };
+    const pendente = g.some((x) => x._pendente);
+    const det = [
+      r.om ? "<span><b>OM</b>" + esc(r.om) + "</span>" : "",
+      r.leitura ? "<span><b>" + (r.leitura.unidade === "H" ? "Horímetro" : "KM") + "</b>" + esc(Number(r.leitura.valor).toLocaleString("pt-BR")) + (r.leitura.unidade === "H" ? " h" : " km") + "</span>" : "",
+      g.length > 1 ? "<span><b>Pneus</b>" + g.length + "</span>" : "",
+      r.observacoes ? "<span><b>Obs.</b>" + esc(r.observacoes) + "</span>" : ""
+    ].join("");
+    let quando = esc(r.horaServico || "");
+    if (r.fim && r.fim.hora) {
+      quando += " → " + (r.fim.data !== r.dataServico ? esc(fmtData(r.fim.data)) + " " : "") + esc(r.fim.hora);
+      if (typeof r.duracaoMin === "number") quando += ' <small style="font-family:var(--f-corpo);font-size:16px;color:var(--muted)">(' + fmtDur(r.duracaoMin) + ")</small>";
+    }
+    const blocos = g.map((x) => {
+      const p = x.posicao || {};
+      const motivo = x.motivo === "Pneu com defeito" ? "Pneu com defeito: " + (x.defeito === "Outro" ? x.motivoTexto : x.defeito) : (x.motivo === "Outro" ? "Outro: " + x.motivoTexto : x.motivo);
+      return '<div class="chamado-pneu">' +
+        (g.length > 1 ? '<span class="np">Pneu ' + (x.pneuNumero || "") + "</span>" : "") +
+        '<div class="pos"><span class="chip">Eixo ' + esc(p.eixo) + '</span><span class="chip">' + esc(p.lado) + "</span>" + (p.posicao ? '<span class="chip">' + esc(p.posicao) + "</span>" : "") + '<span class="chip">' + esc(motivo) + "</span></div>" +
+        '<div class="par"><section class="saiu"><h4>Saiu</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.saiu.serie) + "</dd>" + (x.saiu.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.saiu.tagPneu) + "</dd>" : "") + "<dt>Destino</dt><dd>" + esc(x.saiu.destino) + "</dd></dl></section>" +
+        '<section class="entrou"><h4>Entrou ' + textoCondicao(x.entrou) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.entrou.serie) + "</dd>" + (x.entrou.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.entrou.tagPneu) + "</dd>" : "") + "<dt>Medida</dt><dd>" + esc(x.entrou.medida) + "</dd></dl></section></div></div>";
+    }).join("");
+    return '<article class="registro">' +
+      (mostrarEquip ? '<button class="equip-link" data-tag="' + esc(r.tag) + '"><b>' + esc(r.tag) + "</b><span>" + esc([e.descricao, e.area].filter(Boolean).join(" · ")) + "</span></button>" : "") +
+      '<div class="topo-reg"><span class="quando">' + quando + "</span>" +
+      '<span class="por">' + esc(r.borracheiro.nome) + " · " + esc(r.borracheiro.matricula) + (pendente ? ' <span class="selo pend">Aguardando envio</span>' : "") + "</span></div>" +
+      (det ? '<div class="detalhes">' + det + "</div>" : "") + blocos + "</article>";
+  }
+
   function renderCtrl() {
     if ($("#t-controle").hidden) return;
     if (tagAberta) { renderDetalhe(tagAberta); return; }
+    const porData = vistaCtrl === "data";
+    $("#filtro-periodo").hidden = !porData;
+    $("#lista-datas").hidden = !porData;
+    $("#lista-equip").hidden = porData;
     const regs = todosRegistros();
+    const q = norm($("#i-busca-ctrl").value);
+    const box = porData ? $("#lista-datas") : $("#lista-equip");
+    if (!regs.length) {
+      $("#resumo-ctrl").textContent = "";
+      box.innerHTML = '<div class="vazio">' + (db ? "Nenhuma troca registrada ainda.<br>Cada chamado salvo no tablet aparece aqui." : "Sem conexão com o banco de dados. Os registros aparecem aqui quando a conexão voltar.") + "</div>";
+      return;
+    }
+    if (porData) {
+      const [de, ate] = intervalo();
+      const filtrados = regs.filter((r) => (!de || String(r.dataServico) >= de) && (!ate || String(r.dataServico) <= ate) && bateBusca(r, q));
+      const nCham = agruparChamados(filtrados).length;
+      $("#resumo-ctrl").textContent = plural(nCham, "chamado", "chamados") + " · " + plural(filtrados.length, "pneu trocado", "pneus trocados") +
+        (de || ate ? " · " + (de ? fmtData(de) : "início") + " a " + (ate ? fmtData(ate) : "hoje") : " · todo o período");
+      box.innerHTML = filtrados.length ? htmlDias(filtrados, true) : '<div class="vazio">Nenhuma troca nesse período' + (q ? " com essa busca" : "") + ".<br>Escolha outro período ou toque em “Tudo”.</div>";
+      return;
+    }
     const grupos = new Map();
     regs.forEach((r) => { if (!grupos.has(r.tag)) grupos.set(r.tag, []); grupos.get(r.tag).push(r); });
-    const q = norm($("#i-busca-ctrl").value);
     const itens = Array.from(grupos.entries()).map(([tag, rs]) => {
       const e = equip.find((x) => x.tag === tag) || rs[0].equipamento || { tag };
       return { tag, e, rs };
-    }).filter((it) => !q || norm(it.tag).includes(q) || norm(it.e.descricao).includes(q) || norm(it.e.area).includes(q) || norm(it.e.familia).includes(q) || it.rs.some((r) => norm(r.om).includes(q)));
-    $("#resumo-ctrl").textContent = regs.length ? regs.length + (regs.length === 1 ? " troca registrada" : " trocas registradas") + " em " + grupos.size + (grupos.size === 1 ? " equipamento" : " equipamentos") + (q ? " · mostrando " + itens.length : "") : "";
-    const box = $("#lista-equip");
-    if (!regs.length) {
-      box.innerHTML = '<div class="vazio">' + (db ? "Nenhuma troca registrada ainda.<br>Cada troca salva no tablet aparece aqui, agrupada pela TAG do equipamento." : "Sem conexão com o banco de dados. Os registros aparecem aqui quando a conexão voltar.") + "</div>";
-      return;
-    }
+    }).filter((it) => !q || it.rs.some((r) => bateBusca(r, q)));
+    $("#resumo-ctrl").textContent = plural(regs.length, "pneu trocado", "pneus trocados") + " em " + plural(grupos.size, "equipamento", "equipamentos") + (q ? " · mostrando " + itens.length : "");
     if (!itens.length) { box.innerHTML = '<div class="vazio">Nenhum equipamento encontrado para essa busca.</div>'; return; }
     box.innerHTML = itens.map((it) => {
       const u = it.rs[0];
-      return '<button data-tag="' + esc(it.tag) + '"><span class="tag">' + esc(it.tag) + '</span><span class="meio"><strong>' + esc(it.e.descricao || "") + "</strong><small>" + esc([it.e.familia, it.e.area].filter(Boolean).join(" · ")) + '</small></span><span class="dir"><b>' + it.rs.length + "</b><small>" + (it.rs.length === 1 ? "troca" : "trocas") + " · última " + esc(fmtData(u.dataServico)) + "</small></span></button>";
+      const nCh = agruparChamados(it.rs).length;
+      return '<button data-tag="' + esc(it.tag) + '"><span class="tag">' + esc(it.tag) + '</span><span class="meio"><strong>' + esc(it.e.descricao || "") + "</strong><small>" + esc([it.e.familia, it.e.area].filter(Boolean).join(" · ")) + '</small></span><span class="dir"><b>' + nCh + "</b><small>" + (nCh === 1 ? "chamado" : "chamados") + " · última " + esc(fmtData(u.dataServico)) + "</small></span></button>";
     }).join("");
   }
   $("#i-busca-ctrl").addEventListener("input", renderCtrl);
-  $("#lista-equip").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-tag]"); if (!b) return;
+  $("#ctrl-lista").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-tag]"); if (!b) return;
     tagAberta = b.dataset.tag; $("#ctrl-lista").hidden = true; $("#ctrl-detalhe").hidden = false; renderDetalhe(tagAberta); window.scrollTo(0, 0);
   });
   $("#b-voltar-lista").addEventListener("click", () => { tagAberta = null; $("#ctrl-lista").hidden = false; $("#ctrl-detalhe").hidden = true; renderCtrl(); });
 
   function textoCondicao(en) {
     if (en.condicao === "Novo") return '<span class="selo novo">Novo</span>';
-    const n = en.recapagens ? (en.recapagens >= 4 ? "4ª+ recapagem" : en.recapagens + "ª recapagem") : "";
-    return '<span class="selo recap">Recapado' + (n ? " · " + n : "") + "</span>";
+    return '<span class="selo recap">Recapado' + (en.recapagens ? " · " + en.recapagens + "ª recapagem" : "") + "</span>";
   }
   function renderDetalhe(tag) {
     const rs = todosRegistros().filter((r) => r.tag === tag);
     const e = equip.find((x) => x.tag === tag) || (rs[0] && rs[0].equipamento) || { tag };
-    const grupos = new Map();
-    rs.forEach((r) => { const k = r.chamadoId || r._id; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(r); });
+    const nCh = agruparChamados(rs).length;
     const cab = '<div class="cab-equip"><span class="tag">' + esc(tag) + '</span><span class="desc">' + esc(e.descricao || "") + '</span><div class="chips">' +
       [e.familia, e.area, e.local ? "Local " + e.local : ""].filter(Boolean).map((c) => '<span class="chip">' + esc(c) + "</span>").join("") +
-      '<span class="chip">' + grupos.size + (grupos.size === 1 ? " chamado" : " chamados") + " · " + rs.length + (rs.length === 1 ? " pneu" : " pneus") + "</span></div></div>";
-    const cards = Array.from(grupos.values()).map((g) => {
-      g.sort((a, b) => (a.pneuNumero || 0) - (b.pneuNumero || 0));
-      const r = g[0];
-      const pendente = g.some((x) => x._pendente);
-      const det = [
-        r.om ? "<span><b>OM</b>" + esc(r.om) + "</span>" : "",
-        r.leitura ? "<span><b>" + (r.leitura.unidade === "H" ? "Horímetro" : "KM") + "</b>" + esc(Number(r.leitura.valor).toLocaleString("pt-BR")) + (r.leitura.unidade === "H" ? " h" : " km") + "</span>" : "",
-        r.observacoes ? "<span><b>Obs.</b>" + esc(r.observacoes) + "</span>" : ""
-      ].join("");
-      let quando = esc(fmtData(r.dataServico)) + " · " + esc(r.horaServico);
-      if (r.fim && r.fim.hora) {
-        quando += " → " + (r.fim.data !== r.dataServico ? esc(fmtData(r.fim.data)) + " " : "") + esc(r.fim.hora);
-        if (typeof r.duracaoMin === "number") quando += ' <small style="font-family:var(--f-corpo);font-size:16px;color:var(--muted)">(' + fmtDur(r.duracaoMin) + ")</small>";
-      }
-      const blocos = g.map((x) => {
-        const p = x.posicao || {};
-        const motivo = x.motivo === "Pneu com defeito" ? "Pneu com defeito: " + (x.defeito === "Outro" ? x.motivoTexto : x.defeito) : (x.motivo === "Outro" ? "Outro: " + x.motivoTexto : x.motivo);
-        return '<div class="chamado-pneu">' +
-          (g.length > 1 ? '<span class="np">Pneu ' + (x.pneuNumero || "") + "</span>" : "") +
-          '<div class="pos"><span class="chip">Eixo ' + esc(p.eixo) + '</span><span class="chip">' + esc(p.lado) + "</span>" + (p.posicao ? '<span class="chip">' + esc(p.posicao) + "</span>" : "") + '<span class="chip">' + esc(motivo) + "</span></div>" +
-          '<div class="par"><section class="saiu"><h4>Saiu</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.saiu.serie) + "</dd>" + (x.saiu.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.saiu.tagPneu) + "</dd>" : "") + "<dt>Destino</dt><dd>" + esc(x.saiu.destino) + "</dd></dl></section>" +
-          '<section class="entrou"><h4>Entrou ' + textoCondicao(x.entrou) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.entrou.serie) + "</dd>" + (x.entrou.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.entrou.tagPneu) + "</dd>" : "") + "<dt>Medida</dt><dd>" + esc(x.entrou.medida) + "</dd></dl></section></div></div>";
-      }).join("");
-      return '<article class="registro"><div class="topo-reg"><span class="quando">' + quando + "</span>" +
-        '<span class="por">' + esc(r.borracheiro.nome) + " · " + esc(r.borracheiro.matricula) + (pendente ? ' <span class="selo pend">Aguardando envio</span>' : "") + "</span></div>" +
-        (det ? '<div class="detalhes">' + det + (g.length > 1 ? "<span><b>Pneus</b>" + g.length + "</span>" : "") + "</div>" : "") +
-        blocos + "</article>";
-    }).join("");
-    $("#detalhe-conteudo").innerHTML = cab + (cards || '<div class="vazio">Nenhuma troca registrada neste equipamento.</div>');
+      '<span class="chip">' + plural(nCh, "chamado", "chamados") + " · " + plural(rs.length, "pneu", "pneus") + "</span></div></div>";
+    $("#detalhe-conteudo").innerHTML = cab + (rs.length ? htmlDias(rs, false) : '<div class="vazio">Nenhuma troca registrada neste equipamento.</div>');
   }
+  setPeriodo("30");
 
   $("#b-sair-ctrl").addEventListener("click", () => { tagAberta = null; ir("inicio"); });
 

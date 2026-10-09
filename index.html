@@ -26,6 +26,22 @@
 .chamado-pneu{border-top:1px solid var(--line);padding-top:14px;display:grid;gap:12px}
 .chamado-pneu:first-of-type{border-top:0;padding-top:0}
 .chamado-pneu .np{font-family:var(--f-titulo);font-size:19px;text-transform:uppercase;letter-spacing:.03em;color:var(--brand)}
+
+/* v4: histórico por data */
+.abas{display:inline-flex;margin-top:18px;border:2px solid var(--brand);border-radius:14px;overflow:hidden}
+.abas button{min-height:52px;padding:0 24px;border:0;background:var(--surface);color:var(--brand);font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:.04em}
+.abas button[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink)}
+.filtro-periodo{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:end;margin-top:14px}
+.filtro-periodo .opcoes button{min-height:48px;font-size:16px;padding:6px 16px}
+.datas{display:flex;flex-wrap:wrap;gap:12px}
+.datas label{display:grid;gap:4px;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.datas .campo{min-height:48px;font-size:17px;padding:8px 12px;width:auto}
+.dia{margin-top:22px}
+.dia-cab{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin:0;padding-bottom:8px;border-bottom:2px solid var(--brand);font-family:var(--f-titulo);font-size:26px;text-transform:uppercase;letter-spacing:.03em}
+.dia-cab small{font-family:var(--f-corpo);font-size:15px;font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0}
+.equip-link{justify-self:start;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;border:0;background:var(--brand-soft);border-radius:10px;padding:8px 14px;text-align:left;max-width:100%}
+.equip-link b{font-family:var(--f-titulo);font-size:24px}
+.equip-link span{color:var(--muted);font-weight:600;min-width:0}
 </style>
 </head>
 <body>
@@ -365,18 +381,32 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
   <section id="t-controle" hidden>
     <header class="topo">
       <button class="icone-btn" id="b-sair-ctrl" aria-label="Sair">Sair</button>
-      <h1>Painel do controlador<span class="quem">Trocas por equipamento</span></h1>
+      <h1>Painel do controlador<span class="quem">Histórico de trocas</span></h1>
       <button class="icone-btn" id="b-trocar-senha">Senha</button>
     </header>
     <div id="ctrl-lista">
+      <div class="abas" id="abas-ctrl" role="group" aria-label="Como mostrar o histórico">
+        <button data-vista="data" aria-pressed="true">Por data</button>
+        <button data-vista="equip" aria-pressed="false">Por equipamento</button>
+      </div>
       <div class="barra-busca">
         <div class="busca">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg>
-          <input class="campo" id="i-busca-ctrl" placeholder="Buscar TAG, equipamento, área ou OM" autocomplete="off" aria-label="Buscar equipamento">
+          <input class="campo" id="i-busca-ctrl" placeholder="Buscar TAG, OM, série do pneu ou borracheiro" autocomplete="off" aria-label="Buscar">
+        </div>
+      </div>
+      <div class="filtro-periodo" id="filtro-periodo">
+        <div class="opcoes" id="periodos">
+          <button data-p="hoje">Hoje</button><button data-p="7">7 dias</button><button data-p="30" aria-pressed="true">30 dias</button><button data-p="tudo">Tudo</button>
+        </div>
+        <div class="datas">
+          <label>De <input class="campo" type="date" id="i-de"></label>
+          <label>Até <input class="campo" type="date" id="i-ate"></label>
         </div>
       </div>
       <p class="resumo" id="resumo-ctrl"></p>
-      <div class="lista-equip" id="lista-equip"></div>
+      <div id="lista-datas"></div>
+      <div class="lista-equip" id="lista-equip" hidden></div>
     </div>
     <div id="ctrl-detalhe" hidden>
       <div style="margin-top:16px"><button class="btn-sec" id="b-voltar-lista">← Todos os equipamentos</button></div>
@@ -408,7 +438,7 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
   </form>
 </div>
 
-<script type="module" src="app.js?v=3"></script>
+<script type="module" src="app.js?v=4"></script>
 <script>
 if ("serviceWorker" in navigator) {
   const tinhaVersao = !!navigator.serviceWorker.controller;
