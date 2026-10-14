@@ -1,4 +1,4 @@
-import { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, onSnapshot, collection, query, where, orderBy, limit, getDocs } from "./firebase.js";
+import { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, onSnapshot, collection, query, where, orderBy, limit, getDocs, runTransaction } from "./firebase.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBGWkju71fECEfizymK9dU0v_Wi6IAV0lU",
@@ -36,11 +36,22 @@ function consulta(path, cons = []) {
 }
 function documento(path) {
   return {
-    set: (data) => comPrazo(setDoc(doc(fs, path), data), 15000),
+    set: (data, opts) => comPrazo(setDoc(doc(fs, path), data, opts || {}), 15000),
     onSnapshot: (next, err) => onSnapshot(doc(fs, path), (s) => next(embrulhaDoc(s)), err)
   };
 }
-const bancoFirebase = { doc: documento, collection: (p) => consulta(p) };
+const bancoFirebase = {
+  doc: documento,
+  collection: (p) => consulta(p),
+  /* reserva "qtd" números de TAG de uma vez, sem nunca repetir entre aparelhos */
+  reservarTags: (qtd) => comPrazo(runTransaction(fs, async (t) => {
+    const ref = doc(fs, "config", "contadorTag");
+    const s = await t.get(ref);
+    const ultimo = s.exists() ? Number(s.data().ultimo) || 0 : 0;
+    t.set(ref, { ultimo: ultimo + qtd, atualizadoEm: new Date().toISOString() });
+    return ultimo;
+  }), 12000)
+};
 function conectarFirebase(aoConectar, aoFalhar) {
   onAuthStateChanged(auth, (u) => { if (u) aoConectar(bancoFirebase); });
   auth.authStateReady().then(() => { if (!auth.currentUser) signInAnonymously(auth).catch(aoFalhar); }).catch(aoFalhar);
@@ -68,6 +79,9 @@ function conectarFirebase(aoConectar, aoFalhar) {
   let assinaturaCtrl = null;
   let usuario = null;
   let timerSalvo = null;
+  let pneusMap = LS.get("pneus", {});
+  let reservaTags = LS.get("reservaTags", []);
+  let proximaTela = "registro";
 
   /* ---------- utilidades ---------- */
   const pad = (n) => String(n).padStart(2, "0");
@@ -82,8 +96,61 @@ function conectarFirebase(aoConectar, aoFalhar) {
     return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
   }
 
+  /* ---------- TAG e pneus ---------- */
+  function fmtTag(n) {
+    if (n <= 999) return "AL" + String(n).padStart(3, "0");
+    const k = n - 1000;
+    return "AL" + String.fromCharCode(65 + Math.floor(k / 999)) + String((k % 999) + 1).padStart(3, "0");
+  }
+  function normTag(v) {
+    let s = String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (/^\d{1,3}$/.test(s)) s = "AL" + s.padStart(3, "0");
+    return s;
+  }
+  function pneuPorTag(tag) {
+    if (!tag) return null;
+    let p = pneusMap[tag] ? Object.assign({}, pneusMap[tag]) : null;
+    fila.forEach((f) => { if (f.col === "pneus" && f.id === tag) p = Object.assign(p || {}, f.data); });
+    return p;
+  }
+  function todosPneus() {
+    const m = {};
+    Object.keys(pneusMap).forEach((t) => (m[t] = Object.assign({}, pneusMap[t])));
+    fila.forEach((f) => { if (f.col === "pneus") m[f.id] = Object.assign(m[f.id] || {}, f.data); });
+    return Object.values(m);
+  }
+  function pneuPorSerie(serie) {
+    const s = norm(serie); if (!s) return null;
+    return todosPneus().find((p) => norm(p.serie) === s) || null;
+  }
+  const NOME_STATUS = { estoque: "Em estoque", montado: "Montado", recapagem: "Na recapagem", conserto: "No conserto", sucata: "Sucata" };
+  function textoStatus(pn) {
+    if (!pn) return "";
+    if (pn.status === "montado" && pn.local) return "Montado em " + pn.local.equipTag + " · eixo " + pn.local.eixo + " " + String(pn.local.lado || "").toLowerCase() + (pn.local.posicao ? " " + pn.local.posicao.toLowerCase() : "");
+    return NOME_STATUS[pn.status] || "Situação desconhecida";
+  }
+  const textoRecap = (n) => (n === null || n === undefined || n === "" ? "" : Number(n) === 0 ? "0 recapagem" : Number(n) + "ª recapagem");
+  async function garantirReserva(min) {
+    if (reservaTags.length >= min || !db || !navigator.onLine) return;
+    const ultimo = await db.reservarTags(20);
+    for (let k = 1; k <= 20; k++) reservaTags.push(ultimo + k);
+    LS.set("reservaTags", reservaTags);
+  }
+  async function gerarTag() {
+    if (!reservaTags.length) { try { await garantirReserva(1); } catch (e) {} }
+    if (!reservaTags.length) throw new Error("sem-reserva");
+    const n = reservaTags.shift(); LS.set("reservaTags", reservaTags);
+    garantirReserva(5).catch(() => {});
+    return fmtTag(n);
+  }
+  function evento(texto, extra) {
+    return Object.assign({ data: new Date().toISOString(), texto, por: usuario ? usuario.nome : "" }, extra || {});
+  }
+  function comEvento(pn, ev) { return ((pn && pn.eventos) || []).concat([ev]).slice(-60); }
+  function filaPneu(tag, data) { fila.push({ col: "pneus", id: tag, data, merge: true }); }
+
   /* ---------- navegação ---------- */
-  const telas = ["inicio", "matricula", "registro", "salvo", "senha", "controle"];
+  const telas = ["inicio", "matricula", "registro", "salvo", "senha", "controle", "pneus", "tag"];
   function ir(nome) {
     if (nome === "inicio" && window.__appAtualizado) { location.reload(); return; }
     telas.forEach((t) => ($("#t-" + t).hidden = t !== nome));
@@ -118,7 +185,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
       while (fila.length) {
         const item = fila[0];
         try {
-          await db.collection("registros").doc(item.id).set(item.data);
+          await db.collection(item.col || "registros").doc(item.id).set(item.data, item.merge ? { merge: true } : undefined);
         } catch (e) {
           if (e && (e.code === "invalid_argument" || e.code === "permission-denied")) { console.warn("Registro recusado", e); fila.shift(); LS.set("fila", fila); continue; }
           break;
@@ -143,6 +210,12 @@ function conectarFirebase(aoConectar, aoFalhar) {
     db.doc("config/acesso").onSnapshot((s) => {
       if (s.exists && s.data().senhaHash) { senhaHash = s.data().senhaHash; LS.set("senhaHash", senhaHash); }
     }, () => {});
+    db.collection("pneus").onSnapshot((snap) => {
+      const m = {}; snap.docs.forEach((d) => (m[d.id] = d.data()));
+      pneusMap = m; LS.set("pneus", m);
+      renderCtrl();
+    }, () => {});
+    if (reservaTags.length && reservaTags.length < 5) garantirReserva(5).catch(() => {});
     enviarFila();
   }
   conectarFirebase((banco) => {
@@ -151,7 +224,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
   }, () => { dbPronto = true; atualizarStatus(); });
 
   /* ---------- início ---------- */
-  $("#b-iniciar").addEventListener("click", () => { $("#i-matricula").value = ""; verMatricula(); ir("matricula"); });
+  $("#b-iniciar").addEventListener("click", () => { proximaTela = "registro"; $("#i-matricula").value = ""; verMatricula(); ir("matricula"); });
+  $("#b-pneus").addEventListener("click", () => { proximaTela = "pneus"; $("#i-matricula").value = ""; verMatricula(); ir("matricula"); });
   $("#b-controlador").addEventListener("click", () => { $("#i-senha").value = ""; $("#msg-senha").textContent = ""; ir("senha"); setTimeout(() => $("#i-senha").focus(), 50); });
 
   /* ---------- matrícula ---------- */
@@ -181,6 +255,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
   $("#b-confirmar-mat").addEventListener("click", () => {
     const b = acharBorracheiro($("#i-matricula").value); if (!b) return;
     usuario = { matricula: String(b.matricula), nome: b.nome };
+    if (proximaTela === "pneus") { abrirPneus(); return; }
     novoFormulario(); ir("registro");
   });
 
@@ -188,7 +263,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
   let F = {};
   let pneus = [];
   let historicoTag = [];
-  const novoPneu = (ant) => ({ eixo: null, lado: null, posicao: null, saiuSerie: "", saiuTag: "", saiuCondicao: null, saiuRecapagens: null, destino: null,
+  const novoPneu = (ant) => ({ eixo: null, lado: null, posicao: null, saiuSerie: "", saiuTag: "", saiuTagNova: null, saiuTagAplicada: null, saiuCondicao: null, saiuRecapagens: null, destino: null,
+    entrouTagNova: null, entrouTagAplicada: null,
     entrouSerie: "", entrouTag: "", medida: ant ? ant.medida : "", condicao: null, recapagens: null,
     motivo: null, defeito: null, outro: "" });
 
@@ -253,6 +329,39 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const u = mesmo[0];
     return u && u.entrou && u.entrou.serie ? u : null;
   }
+  function htmlTagStatus(p, lado) {
+    const tag = normTag(p[lado + "Tag"]);
+    const gerar = '<button class="btn-gerar" data-acao="gerar" data-lado="' + lado + '">' + (tag ? "Gerar TAG nova" : "Pneu sem TAG? Gerar TAG nova") + "</button>";
+    if (!tag) return gerar;
+    if (p[lado + "TagNova"] === tag) return '<div class="tag-nova"><span>TAG nova</span><b>' + esc(tag) + "</b><small>Escreva no pneu com o marcador</small></div>";
+    const pn = pneuPorTag(tag);
+    if (!pn) return '<div class="tag-erro">A TAG ' + esc(tag) + " não está cadastrada. Confira o que está escrito no pneu.</div>" + gerar;
+    let aviso = "";
+    if (lado === "entrou" && pn.status === "montado") aviso = "O sistema mostra este pneu já montado (" + textoStatus(pn) + "). Confira a TAG.";
+    if (lado === "entrou" && pn.status === "recapagem") aviso = "Voltou da recapagem: marcado como " + (Math.min(10, (Number(pn.recapagens) || 0) + 1)) + "ª recapagem. Confira e corrija nos botões de recapagem se precisar.";
+    if (lado === "entrou" && pn.status === "sucata") aviso = "O sistema mostra este pneu como sucata. Confira a TAG.";
+    if (lado === "saiu" && pn.status !== "montado") aviso = "O sistema mostra este pneu como “" + (NOME_STATUS[pn.status] || "?") + "”, não montado. Confira a TAG.";
+    if (lado === "saiu" && pn.status === "montado" && pn.local && F.equipamento && pn.local.equipTag !== F.equipamento.tag) aviso = "O sistema mostra este pneu em outro equipamento (" + pn.local.equipTag + "). Confira a TAG.";
+    return '<div class="tag-ok"><b>' + esc(tag) + "</b> · série " + esc(pn.serie || "—") + (pn.medida ? " · " + esc(pn.medida) : "") + (textoRecap(pn.recapagens) ? " · " + esc(textoRecap(pn.recapagens)) : "") +
+      "<small>" + esc(textoStatus(pn)) + "</small></div>" + (aviso ? '<div class="tag-aviso">' + esc(aviso) + "</div>" : "");
+  }
+  function aplicarPneu(p, lado, tag) {
+    const pn = pneuPorTag(tag); if (!pn) return false;
+    if (p[lado + "TagAplicada"] === tag) return false;
+    p[lado + "TagAplicada"] = tag;
+    const rec = pn.recapagens === undefined || pn.recapagens === null ? null : String(pn.recapagens);
+    if (lado === "saiu") {
+      if (pn.serie) p.saiuSerie = pn.serie;
+      if (rec !== null) { p.saiuRecapagens = rec; p.saiuCondicao = rec === "0" ? "Sem recapagem" : "Recapado"; }
+    } else {
+      if (pn.serie) p.entrouSerie = pn.serie;
+      if (pn.medida) p.medida = pn.medida;
+      let r2 = rec;
+      if (pn.status === "recapagem") r2 = String(Math.min(10, (Number(pn.recapagens) || 0) + 1));
+      if (r2 !== null) { p.recapagens = r2; p.condicao = r2 === "0" ? "Novo" : "Recapado"; }
+    }
+    return true;
+  }
   function htmlPneu(p, i) {
     const u = sugestaoPara(p);
     const sug = u && norm(p.saiuSerie) !== norm(u.entrou.serie)
@@ -268,14 +377,16 @@ function conectarFirebase(aoConectar, aoFalhar) {
       sug +
       '<div class="par" style="margin-top:18px">' +
         '<section class="saiu"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Pneu que saiu</h4>' +
+          '<span class="rotulo">TAG do pneu</span>' + entrada("saiuTag", p.saiuTag, "TAG do pneu que saiu", ' placeholder="ex.: AL015"') +
+          '<div class="tag-status" data-tagstatus="saiu">' + htmlTagStatus(p, "saiu") + "</div>" +
           '<span class="rotulo">Nº de série</span>' + entrada("saiuSerie", p.saiuSerie, "Nº de série do pneu que saiu") +
-          '<span class="rotulo">TAG do pneu <span class="opc">(opcional)</span></span>' + entrada("saiuTag", p.saiuTag, "TAG do pneu que saiu") +
           '<span class="rotulo">Recapagens <span class="opc">(0 = nunca foi recapado)</span></span>' + grupo("saiuRecapagens", p.saiuRecapagens) +
           '<span class="rotulo">Destino</span>' + grupo("destino", p.destino) +
         "</section>" +
         '<section class="entrou"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Pneu que entrou</h4>' +
+          '<span class="rotulo">TAG do pneu</span>' + entrada("entrouTag", p.entrouTag, "TAG do pneu que entrou", ' placeholder="ex.: AL015"') +
+          '<div class="tag-status" data-tagstatus="entrou">' + htmlTagStatus(p, "entrou") + "</div>" +
           '<span class="rotulo">Nº de série</span>' + entrada("entrouSerie", p.entrouSerie, "Nº de série do pneu que entrou") +
-          '<span class="rotulo">TAG do pneu <span class="opc">(opcional)</span></span>' + entrada("entrouTag", p.entrouTag, "TAG do pneu que entrou") +
           '<span class="rotulo">Tipo de pneu (medida)</span>' + entrada("medida", p.medida, "Tipo de pneu (medida)", ' list="medidas" placeholder="ex.: 295/80 R22.5"') +
           '<span class="rotulo">Recapagens <span class="opc">(0 = pneu novo)</span></span>' + grupo("recapagens", p.recapagens) +
         "</section>" +
@@ -295,9 +406,22 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const card = e.target.closest(".pneu"); if (!card) return;
     const i = +card.dataset.idx, p = pneus[i];
     if (e.target.closest('[data-acao="remover"]')) { pneus.splice(i, 1); renderPneus(); return; }
+    const ger = e.target.closest('[data-acao="gerar"]');
+    if (ger) {
+      const lado = ger.dataset.lado;
+      ger.disabled = true; ger.textContent = "Gerando TAG…";
+      gerarTag().then((t) => {
+        p[lado + "Tag"] = t; p[lado + "TagNova"] = t; p[lado + "TagAplicada"] = t;
+        renderPneu(i);
+      }).catch(() => {
+        const box = card.querySelector('[data-tagstatus="' + lado + '"]');
+        if (box) box.innerHTML = '<div class="tag-erro">Sem internet para gerar TAG nova agora. Conecte o tablet e toque de novo.</div>' + htmlTagStatus(p, lado);
+      });
+      return;
+    }
     const usar = e.target.closest('[data-acao="usar-sug"]');
     if (usar) {
-      p.saiuSerie = usar.dataset.serie; if (usar.dataset.tag) p.saiuTag = usar.dataset.tag;
+      p.saiuSerie = usar.dataset.serie; if (usar.dataset.tag) { p.saiuTag = usar.dataset.tag; aplicarPneu(p, "saiu", normTag(usar.dataset.tag)); }
       if (usar.dataset.cond === "Novo") { p.saiuCondicao = "Sem recapagem"; p.saiuRecapagens = "0"; }
       else if (usar.dataset.cond === "Recapado" && usar.dataset.recap) { p.saiuCondicao = "Recapado"; p.saiuRecapagens = usar.dataset.recap; }
       renderPneu(i); return;
@@ -313,8 +437,20 @@ function conectarFirebase(aoConectar, aoFalhar) {
   });
   $("#lista-pneus").addEventListener("input", (e) => {
     const inp = e.target.closest("[data-pinput]"); if (!inp) return;
-    const card = inp.closest(".pneu"); pneus[+card.dataset.idx][inp.dataset.pinput] = inp.value;
+    const card = inp.closest(".pneu"), i = +card.dataset.idx, p = pneus[i], campo = inp.dataset.pinput;
+    p[campo] = inp.value;
     card.classList.remove("falta");
+    if (campo === "saiuTag" || campo === "entrouTag") {
+      const lado = campo === "saiuTag" ? "saiu" : "entrou";
+      const tag = normTag(inp.value);
+      if (aplicarPneu(p, lado, tag)) {
+        renderPneu(i);
+        const novo = $("#pneu-" + i + ' [data-pinput="' + campo + '"]');
+        if (novo) { novo.focus(); const n = novo.value.length; try { novo.setSelectionRange(n, n); } catch (er) {} }
+      } else {
+        const box = card.querySelector('[data-tagstatus="' + lado + '"]'); if (box) box.innerHTML = htmlTagStatus(p, lado);
+      }
+    }
   });
   $("#b-add-pneu").addEventListener("click", () => {
     pneus.push(novoPneu(pneus[pneus.length - 1]));
@@ -395,11 +531,18 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const leitura = $("#i-leitura").value.trim();
     if (leitura && !F.unidade) add("#c-chamado", "Marque se a leitura é KM ou horas");
     if (leitura && isNaN(numLeitura(leitura))) add("#c-chamado", "A leitura deve ser só número");
-    const posUsadas = {}, seriesEntrou = {};
+    const posUsadas = {}, seriesEntrou = {}, tagsUsadas = {};
     pneus.forEach((p, k) => {
       const alvo = "#pneu-" + k, n = pneus.length > 1 ? "Pneu " + (k + 1) + ": " : "";
       if (!p.eixo) add(alvo, n + "escolha o eixo");
       if (!p.lado) add(alvo, n + "escolha o lado (direito ou esquerdo)");
+      const ts = normTag(p.saiuTag), te = normTag(p.entrouTag);
+      if (!ts) add(alvo, n + "TAG do pneu que saiu (se não tiver, gere uma nova)");
+      else if (!pneuPorTag(ts) && p.saiuTagNova !== ts) add(alvo, n + "a TAG " + ts + " (pneu que saiu) não está cadastrada");
+      if (!te) add(alvo, n + "TAG do pneu que entrou (se não tiver, gere uma nova)");
+      else if (!pneuPorTag(te) && p.entrouTagNova !== te) add(alvo, n + "a TAG " + te + " (pneu que entrou) não está cadastrada");
+      if (ts && ts === te) add(alvo, n + "o pneu que saiu e o que entrou estão com a mesma TAG");
+      [ts, te].forEach((t) => { if (!t) return; if (tagsUsadas[t] !== undefined && tagsUsadas[t] !== k) add(alvo, n + "a TAG " + t + " já foi usada no pneu " + (tagsUsadas[t] + 1)); else tagsUsadas[t] = k; });
       if (!p.saiuSerie.trim()) add(alvo, n + "nº de série do pneu que saiu");
       if (p.saiuRecapagens === null || p.saiuRecapagens === undefined) add(alvo, n + "recapagens do pneu que saiu (0 se nunca foi recapado)");
       if (!p.destino) add(alvo, n + "destino do pneu que saiu");
@@ -466,9 +609,9 @@ function conectarFirebase(aoConectar, aoFalhar) {
       return Object.assign({}, comum, {
         pneuNumero: k + 1,
         posicao: { eixo: Number(p.eixo), lado: p.lado, posicao: p.posicao || null },
-        saiu: { serie: p.saiuSerie.trim().toUpperCase(), tagPneu: p.saiuTag.trim().toUpperCase(), destino: p.destino,
+        saiu: { serie: p.saiuSerie.trim().toUpperCase(), tagPneu: normTag(p.saiuTag), tagNova: p.saiuTagNova === normTag(p.saiuTag), destino: p.destino,
           condicao: p.saiuCondicao, recapagens: Number(p.saiuRecapagens) },
-        entrou: { serie: p.entrouSerie.trim().toUpperCase(), tagPneu: p.entrouTag.trim().toUpperCase(), medida, condicao: p.condicao,
+        entrou: { serie: p.entrouSerie.trim().toUpperCase(), tagPneu: normTag(p.entrouTag), tagNova: p.entrouTagNova === normTag(p.entrouTag), medida, condicao: p.condicao,
           recapagens: Number(p.recapagens) },
         motivo: p.motivo,
         defeito: p.defeito || null,
@@ -477,6 +620,23 @@ function conectarFirebase(aoConectar, aoFalhar) {
     });
     LS.set("medidas", med.slice(0, 30));
     regs.forEach((r) => fila.push({ id: chamadoId + "-" + r.pneuNumero, data: r }));
+    /* estoque: o pneu que saiu vai para o destino; o que entrou fica montado */
+    const STATUS_DESTINO = { Conserto: "conserto", Recapagem: "recapagem", Estoque: "estoque", Sucata: "sucata" };
+    regs.forEach((r) => {
+      const pos = "eixo " + r.posicao.eixo + " " + r.posicao.lado.toLowerCase() + (r.posicao.posicao ? " " + r.posicao.posicao.toLowerCase() : "");
+      const velhoS = pneuPorTag(r.saiu.tagPneu);
+      const dS = { tag: r.saiu.tagPneu, serie: r.saiu.serie, recapagens: r.saiu.recapagens, status: STATUS_DESTINO[r.saiu.destino] || "estoque", local: null, atualizadoEm: agora,
+        eventos: comEvento(velhoS, evento("Saiu de " + r.tag + " (" + pos + ") → " + r.saiu.destino + (r.motivo ? " · " + r.motivo : ""), { om: r.om })) };
+      if (!velhoS) { dS.criadoEm = agora; dS.criadoPor = { matricula: usuario.matricula, nome: usuario.nome }; }
+      if (!velhoS || !velhoS.medida) dS.medida = r.entrou.medida; /* mesma posição, mesma medida */
+      filaPneu(r.saiu.tagPneu, dS);
+      const velhoE = pneuPorTag(r.entrou.tagPneu);
+      const dE = { tag: r.entrou.tagPneu, serie: r.entrou.serie, medida: r.entrou.medida, recapagens: r.entrou.recapagens, status: "montado",
+        local: { equipTag: r.tag, equipDesc: r.equipamento.descricao, eixo: r.posicao.eixo, lado: r.posicao.lado, posicao: r.posicao.posicao }, atualizadoEm: agora,
+        eventos: comEvento(velhoE, evento("Montado em " + r.tag + " (" + pos + ")", { om: r.om })) };
+      if (!velhoE) { dE.criadoEm = agora; dE.criadoPor = { matricula: usuario.matricula, nome: usuario.nome }; }
+      filaPneu(r.entrou.tagPneu, dE);
+    });
     LS.set("fila", fila);
     atualizarStatus(); enviarFila(); renderCtrl();
     mostrarSalvo(regs);
@@ -501,6 +661,129 @@ function conectarFirebase(aoConectar, aoFalhar) {
     setTimeout(() => { if (b.dataset.confirma === "1") { b.dataset.confirma = ""; b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg>'; } }, 4000);
   });
 
+  /* ---------- pneus: cadastro e atualização ---------- */
+  let C = {};
+  function grupoSimples(sel, aoMudar) {
+    $(sel).addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-v]"); if (!b) return;
+      $$(sel + " button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      aoMudar(b.dataset.v);
+    });
+  }
+  function marcar(sel, v) { $$(sel + " button").forEach((x) => x.setAttribute("aria-pressed", String(v !== null && v !== undefined && x.dataset.v === String(v)))); }
+  grupoSimples("#c-recap", (v) => { C.recap = v; });
+  grupoSimples("#c-situacao", (v) => { C.situacao = v; });
+  grupoSimples("#a-situacao", (v) => {
+    C.aSituacao = v;
+    const pn = C.aTag && pneuPorTag(C.aTag);
+    if (pn && pn.status === "recapagem" && v !== "recapagem" && v !== "sucata" && Number(C.aRecap) === Number(pn.recapagens)) {
+      C.aRecap = Math.min(10, (Number(pn.recapagens) || 0) + 1); marcar("#a-recap", C.aRecap);
+      $("#pend-atu").innerHTML = '<div class="tag-aviso">Voltou da recapagem: marcado como ' + C.aRecap + "ª recapagem. Confira.</div>";
+    }
+  });
+  grupoSimples("#a-recap", (v) => { C.aRecap = v; });
+
+  function abrirPneus(modo) {
+    $("#quem-pneus").textContent = "Borracheiro: " + usuario.nome + " · " + usuario.matricula;
+    const med = LS.get("medidas", []);
+    $("#medidas").innerHTML = med.map((m) => '<option value="' + esc(m) + '">').join("");
+    novoCadastro(false);
+    limparAtualizacao();
+    modoPneus(modo || "novo");
+    ir("pneus");
+  }
+  function modoPneus(m) {
+    $$("#abas-pneus button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.modo === m)));
+    $("#cad-novo").hidden = m !== "novo"; $("#cad-atualizar").hidden = m !== "atualizar";
+  }
+  $("#abas-pneus").addEventListener("click", (e) => { const b = e.target.closest("button[data-modo]"); if (b) modoPneus(b.dataset.modo); });
+  function novoCadastro(manterLote) {
+    const lote = manterLote ? { medida: $("#c-medida").value, marca: $("#c-marca").value, recap: C.recap, situacao: C.situacao } : {};
+    C = { recap: lote.recap ?? null, situacao: lote.situacao || "estoque" };
+    $("#c-serie").value = ""; $("#c-medida").value = lote.medida || ""; $("#c-marca").value = lote.marca || "";
+    marcar("#c-recap", C.recap); marcar("#c-situacao", C.situacao);
+    $("#pend-cad").innerHTML = ""; $("#c-cad").classList.remove("falta");
+  }
+  $("#b-cadastrar").addEventListener("click", async () => {
+    const faltas = [];
+    const serie = $("#c-serie").value.trim().toUpperCase(), medida = $("#c-medida").value.trim().toUpperCase();
+    if (!serie) faltas.push("Nº de série");
+    if (!medida) faltas.push("Tipo de pneu (medida)");
+    if (C.recap === null || C.recap === undefined) faltas.push("Recapagens (0 se for novo)");
+    const dup = serie && pneuPorSerie(serie);
+    if (dup) faltas.push("Esse nº de série já está cadastrado como " + dup.tag + ". Use a aba “Pneu com TAG”.");
+    if (faltas.length) {
+      $("#c-cad").classList.add("falta");
+      $("#pend-cad").innerHTML = '<div class="pendencias">Confira:<ul>' + faltas.map((f) => "<li>" + esc(f) + "</li>").join("") + "</ul></div>";
+      return;
+    }
+    const btn = $("#b-cadastrar"); btn.disabled = true; btn.textContent = "Gerando TAG…";
+    let tag;
+    try { tag = await gerarTag(); }
+    catch (e) {
+      $("#pend-cad").innerHTML = '<div class="pendencias">Sem internet para gerar a TAG agora. Conecte o tablet e tente de novo.</div>';
+      btn.disabled = false; btn.textContent = "Cadastrar e gerar TAG"; return;
+    }
+    btn.disabled = false; btn.textContent = "Cadastrar e gerar TAG";
+    const agora = new Date().toISOString();
+    const marca = $("#c-marca").value.trim();
+    const recap = Number(C.recap);
+    filaPneu(tag, { tag, serie, medida, marca, recapagens: recap, status: C.situacao, local: null, criadoEm: agora, atualizadoEm: agora,
+      criadoPor: { matricula: usuario.matricula, nome: usuario.nome },
+      eventos: [evento("Cadastrado · " + (NOME_STATUS[C.situacao] || C.situacao) + " · " + (recap === 0 ? "novo" : recap + "ª recapagem"))] });
+    LS.set("fila", fila);
+    const med = LS.get("medidas", []); if (!med.includes(medida)) { med.unshift(medida); LS.set("medidas", med.slice(0, 30)); }
+    atualizarStatus(); enviarFila();
+    $("#tg-tag").textContent = tag;
+    $("#tg-resumo").textContent = "Série " + serie + " · " + medida + (marca ? " · " + marca : "") + " · " + (recap === 0 ? "novo" : recap + "ª recapagem") + " · " + NOME_STATUS[C.situacao] + "." +
+      (navigator.onLine && db ? "" : " Sem conexão agora: o cadastro sobe sozinho quando a internet voltar.");
+    ir("tag");
+  });
+  $("#b-cad-outro").addEventListener("click", () => { novoCadastro(true); modoPneus("novo"); ir("pneus"); setTimeout(() => $("#c-serie").focus(), 50); });
+  $("#b-cad-sair").addEventListener("click", () => { usuario = null; ir("inicio"); });
+  $("#b-sair-pneus").addEventListener("click", () => { usuario = null; ir("inicio"); });
+
+  function limparAtualizacao() {
+    C.aTag = null; C.aSituacao = null; C.aRecap = null;
+    $("#a-tag").value = ""; $("#a-obs").value = ""; $("#a-ficha").innerHTML = "";
+    $("#a-campos").hidden = true; $("#b-atualizar").hidden = true; $("#pend-atu").innerHTML = "";
+  }
+  $("#a-tag").addEventListener("input", () => {
+    const tag = normTag($("#a-tag").value);
+    const pn = pneuPorTag(tag);
+    $("#pend-atu").innerHTML = "";
+    if (!tag) { $("#a-ficha").innerHTML = ""; $("#a-campos").hidden = true; $("#b-atualizar").hidden = true; return; }
+    if (!pn) {
+      $("#a-ficha").innerHTML = '<div class="tag-erro" style="margin-top:10px">A TAG ' + esc(tag) + " não está cadastrada. Confira o que está escrito no pneu.</div>";
+      $("#a-campos").hidden = true; $("#b-atualizar").hidden = true; C.aTag = null; return;
+    }
+    if (C.aTag !== tag) {
+      C.aTag = tag; C.aSituacao = pn.status === "montado" ? null : pn.status; C.aRecap = pn.recapagens;
+      marcar("#a-situacao", C.aSituacao); marcar("#a-recap", C.aRecap); $("#a-obs").value = "";
+    }
+    $("#a-ficha").innerHTML = '<div class="tag-ok" style="margin-top:10px"><b>' + esc(tag) + "</b> · série " + esc(pn.serie || "—") + (pn.medida ? " · " + esc(pn.medida) : "") + (pn.marca ? " · " + esc(pn.marca) : "") +
+      (textoRecap(pn.recapagens) ? " · " + esc(textoRecap(pn.recapagens)) : "") + "<small>" + esc(textoStatus(pn)) + "</small></div>" +
+      (pn.status === "montado" ? '<div class="tag-aviso">Este pneu está montado. Para tirar do equipamento, registre uma troca. Só altere aqui se o sistema estiver errado.</div>' : "");
+    $("#a-campos").hidden = false; $("#b-atualizar").hidden = false;
+  });
+  $("#b-atualizar").addEventListener("click", () => {
+    const tag = C.aTag, pn = pneuPorTag(tag);
+    if (!pn) return;
+    if (!C.aSituacao) { $("#pend-atu").innerHTML = '<div class="pendencias">Escolha onde o pneu está agora.</div>'; return; }
+    const agora = new Date().toISOString();
+    const recap = C.aRecap === null || C.aRecap === undefined ? pn.recapagens : Number(C.aRecap);
+    const mudou = [];
+    if (C.aSituacao !== pn.status) mudou.push((NOME_STATUS[pn.status] || "?") + " → " + NOME_STATUS[C.aSituacao]);
+    if (recap !== pn.recapagens) mudou.push("recapagens " + (pn.recapagens ?? "?") + " → " + recap);
+    const obs = $("#a-obs").value.trim();
+    if (!mudou.length && !obs) { $("#pend-atu").innerHTML = '<div class="pendencias">Nada foi alterado.</div>'; return; }
+    filaPneu(tag, { status: C.aSituacao, local: C.aSituacao === "montado" ? pn.local : null, recapagens: recap, atualizadoEm: agora,
+      eventos: comEvento(pn, evento("Atualizado" + (mudou.length ? ": " + mudou.join(" · ") : "") + (obs ? " · " + obs : ""))) });
+    LS.set("fila", fila); atualizarStatus(); enviarFila(); renderCtrl();
+    limparAtualizacao();
+    $("#pend-atu").innerHTML = '<div class="msg-ok">Pneu ' + esc(tag) + " atualizado" + (mudou.length ? ": " + esc(mudou.join(" · ")) : "") + ".</div>";
+  });
+
   /* ---------- controlador ---------- */
   $("#f-senha").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -516,7 +799,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
   let tagAberta = null;
   function abrirControle() {
     ir("controle");
-    $("#ctrl-lista").hidden = false; $("#ctrl-detalhe").hidden = true; tagAberta = null;
+    $("#ctrl-lista").hidden = false; $("#ctrl-detalhe").hidden = true; tagAberta = null; pneuAberto = null;
     if (db && !inscritoCtrl) {
       inscritoCtrl = true;
       db.collection("registros").orderBy("dataHora", "desc").limit(1000).onSnapshot((snap) => {
@@ -609,8 +892,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
       return '<div class="chamado-pneu">' +
         (g.length > 1 ? '<span class="np">Pneu ' + (x.pneuNumero || "") + "</span>" : "") +
         '<div class="pos"><span class="chip">Eixo ' + esc(p.eixo) + '</span><span class="chip">' + esc(p.lado) + "</span>" + (p.posicao ? '<span class="chip">' + esc(p.posicao) + "</span>" : "") + '<span class="chip">' + esc(motivo) + "</span></div>" +
-        '<div class="par"><section class="saiu"><h4>Saiu ' + textoSaiu(x.saiu) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.saiu.serie) + "</dd>" + (x.saiu.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.saiu.tagPneu) + "</dd>" : "") + "<dt>Destino</dt><dd>" + esc(x.saiu.destino) + "</dd></dl></section>" +
-        '<section class="entrou"><h4>Entrou ' + textoCondicao(x.entrou) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.entrou.serie) + "</dd>" + (x.entrou.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.entrou.tagPneu) + "</dd>" : "") + "<dt>Medida</dt><dd>" + esc(x.entrou.medida) + "</dd></dl></section></div></div>";
+        '<div class="par"><section class="saiu"><h4>Saiu ' + textoSaiu(x.saiu) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.saiu.serie) + "</dd>" + (x.saiu.tagPneu ? '<dt>TAG</dt><dd><button class="link-pneu" data-pneu="' + esc(x.saiu.tagPneu) + '">' + esc(x.saiu.tagPneu) + "</button></dd>" : "") + "<dt>Destino</dt><dd>" + esc(x.saiu.destino) + "</dd></dl></section>" +
+        '<section class="entrou"><h4>Entrou ' + textoCondicao(x.entrou) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.entrou.serie) + "</dd>" + (x.entrou.tagPneu ? '<dt>TAG</dt><dd><button class="link-pneu" data-pneu="' + esc(x.entrou.tagPneu) + '">' + esc(x.entrou.tagPneu) + "</button></dd>" : "") + "<dt>Medida</dt><dd>" + esc(x.entrou.medida) + "</dd></dl></section></div></div>";
     }).join("");
     return '<article class="registro">' +
       (mostrarEquip ? '<button class="equip-link" data-tag="' + esc(r.tag) + '"><b>' + esc(r.tag) + "</b><span>" + esc([e.descricao, e.area].filter(Boolean).join(" · ")) + "</span></button>" : "") +
@@ -619,13 +902,65 @@ function conectarFirebase(aoConectar, aoFalhar) {
       (det ? '<div class="detalhes">' + det + "</div>" : "") + blocos + "</article>";
   }
 
+  let pneuAberto = null;
+  let filtroStatus = null;
+  function renderEstoque() {
+    const q = norm($("#i-busca-ctrl").value);
+    const todos = todosPneus();
+    const box = $("#lista-estoque");
+    if (!todos.length) {
+      $("#resumo-ctrl").textContent = "";
+      box.innerHTML = '<div class="vazio">Nenhum pneu cadastrado ainda.<br>Os pneus aparecem aqui quando o borracheiro cadastra no tablet (“Cadastrar ou atualizar pneu”) ou gera uma TAG na hora da troca.</div>';
+      return;
+    }
+    const ordem = ["estoque", "montado", "recapagem", "conserto", "sucata"];
+    const cont = {}; ordem.forEach((s) => (cont[s] = 0)); todos.forEach((p) => (cont[p.status] = (cont[p.status] || 0) + 1));
+    const chips = '<div class="status-chips" id="chips-status"><button data-st="" aria-pressed="' + (!filtroStatus) + '"><b>' + todos.length + "</b><span>Todos</span></button>" +
+      ordem.map((s) => '<button data-st="' + s + '" aria-pressed="' + (filtroStatus === s) + '"><b>' + cont[s] + "</b><span>" + NOME_STATUS[s] + "</span></button>").join("") + "</div>";
+    const est = todos.filter((p) => p.status === "estoque");
+    const porMed = {};
+    est.forEach((p) => { const m = p.medida || "Sem medida"; porMed[m] = porMed[m] || { n: 0, novos: 0, rec: 0 }; porMed[m].n++; if (Number(p.recapagens) === 0) porMed[m].novos++; else porMed[m].rec++; });
+    const meds = Object.keys(porMed).sort();
+    const tabela = meds.length ? '<div class="tabela-medidas"><table><thead><tr><th>Em estoque por medida</th><th style="text-align:right">Total</th><th style="text-align:right">Novos</th><th style="text-align:right">Recapados</th></tr></thead><tbody>' +
+      meds.map((m) => "<tr><td>" + esc(m) + '</td><td class="n">' + porMed[m].n + '</td><td class="n">' + porMed[m].novos + '</td><td class="n">' + porMed[m].rec + "</td></tr>").join("") + "</tbody></table></div>" : "";
+    const lista = todos.filter((p) => (!filtroStatus || p.status === filtroStatus) &&
+      (!q || [p.tag, p.serie, p.medida, p.marca, p.local && p.local.equipTag].some((v) => norm(v).includes(q))))
+      .sort((a, b) => String(a.tag).localeCompare(String(b.tag), "pt-BR", { numeric: true }));
+    $("#resumo-ctrl").textContent = todos.length + (todos.length === 1 ? " pneu cadastrado" : " pneus cadastrados") + (filtroStatus || q ? " · mostrando " + lista.length : "");
+    box.innerHTML = chips + (filtroStatus && filtroStatus !== "estoque" ? "" : tabela) +
+      (lista.length ? '<div class="lista-pneus-est">' + lista.map((p) =>
+        '<button data-pneu="' + esc(p.tag) + '"><span class="tg">' + esc(p.tag) + '</span><span class="md"><strong>' + esc(p.medida || "Medida não informada") + (p.marca ? " · " + esc(p.marca) : "") + "</strong><small>Série " + esc(p.serie || "—") + " · " + esc(textoRecap(p.recapagens) || "recapagens não informadas") + "</small></span>" +
+        '<span class="selo st-' + esc(p.status) + '">' + esc(p.status === "montado" && p.local ? "Montado · " + p.local.equipTag : NOME_STATUS[p.status] || "?") + "</span></button>").join("") + "</div>"
+        : '<div class="vazio">Nenhum pneu com esse filtro.</div>');
+  }
+  function fmtDataHora(iso) { const d = new Date(iso); return isNaN(d) ? "" : fmtData(hojeISO(d)) + " " + horaHM(d); }
+  function renderFichaPneu(tag) {
+    const pn = pneuPorTag(tag);
+    if (!pn) { $("#detalhe-conteudo").innerHTML = '<div class="vazio">Pneu ' + esc(tag) + " não encontrado.</div>"; return; }
+    const cab = '<div class="cab-equip"><span class="tag">' + esc(tag) + '</span><span class="desc">' + esc(pn.medida || "Medida não informada") + (pn.marca ? " · " + esc(pn.marca) : "") + '</span><div class="chips">' +
+      '<span class="selo st-' + esc(pn.status) + '" style="font-size:15px;padding:4px 12px">' + esc(textoStatus(pn)) + "</span>" +
+      '<span class="chip">Série ' + esc(pn.serie || "—") + "</span>" + (textoRecap(pn.recapagens) ? '<span class="chip">' + esc(textoRecap(pn.recapagens)) + "</span>" : "") +
+      (pn.criadoEm ? '<span class="chip">Cadastrado em ' + esc(fmtData(hojeISO(new Date(pn.criadoEm)))) + (pn.criadoPor ? " por " + esc(pn.criadoPor.nome) : "") + "</span>" : "") + "</div></div>";
+    const evs = (pn.eventos || []).slice().reverse();
+    const lista = evs.length ? '<div class="ficha-eventos">' + evs.map((ev) => "<div><time>" + esc(fmtDataHora(ev.data)) + "</time><span>" + esc(ev.texto) + "</span>" +
+      ((ev.por || ev.om) ? "<small>" + esc([ev.por, ev.om ? "OM " + ev.om : ""].filter(Boolean).join(" · ")) + "</small>" : "") + "</div>").join("") + "</div>" : '<div class="vazio">Sem movimentações registradas.</div>';
+    $("#detalhe-conteudo").innerHTML = cab + '<h3 class="dia-cab" style="margin-top:22px"><span>Vida do pneu</span><small>' + evs.length + (evs.length === 1 ? " movimentação" : " movimentações") + "</small></h3>" + lista;
+  }
+  function abrirFicha(tag) {
+    pneuAberto = tag; tagAberta = null;
+    $("#ctrl-lista").hidden = true; $("#ctrl-detalhe").hidden = false; renderFichaPneu(tag); window.scrollTo(0, 0);
+  }
+
   function renderCtrl() {
     if ($("#t-controle").hidden) return;
     if (tagAberta) { renderDetalhe(tagAberta); return; }
-    const porData = vistaCtrl === "data";
+    if (pneuAberto) { renderFichaPneu(pneuAberto); return; }
+    const porData = vistaCtrl === "data", porEstoque = vistaCtrl === "estoque";
     $("#filtro-periodo").hidden = !porData;
     $("#lista-datas").hidden = !porData;
-    $("#lista-equip").hidden = porData;
+    $("#lista-equip").hidden = vistaCtrl !== "equip";
+    $("#lista-estoque").hidden = !porEstoque;
+    if (porEstoque) { renderEstoque(); return; }
     const regs = todosRegistros();
     const q = norm($("#i-busca-ctrl").value);
     const box = porData ? $("#lista-datas") : $("#lista-equip");
@@ -659,10 +994,13 @@ function conectarFirebase(aoConectar, aoFalhar) {
   }
   $("#i-busca-ctrl").addEventListener("input", renderCtrl);
   $("#ctrl-lista").addEventListener("click", (e) => {
+    const st = e.target.closest("#chips-status button"); if (st) { filtroStatus = st.dataset.st || null; renderCtrl(); return; }
+    const pnb = e.target.closest("[data-pneu]"); if (pnb) { abrirFicha(pnb.dataset.pneu); return; }
     const b = e.target.closest("[data-tag]"); if (!b) return;
-    tagAberta = b.dataset.tag; $("#ctrl-lista").hidden = true; $("#ctrl-detalhe").hidden = false; renderDetalhe(tagAberta); window.scrollTo(0, 0);
+    tagAberta = b.dataset.tag; pneuAberto = null; $("#ctrl-lista").hidden = true; $("#ctrl-detalhe").hidden = false; renderDetalhe(tagAberta); window.scrollTo(0, 0);
   });
-  $("#b-voltar-lista").addEventListener("click", () => { tagAberta = null; $("#ctrl-lista").hidden = false; $("#ctrl-detalhe").hidden = true; renderCtrl(); });
+  $("#detalhe-conteudo").addEventListener("click", (e) => { const pnb = e.target.closest("[data-pneu]"); if (pnb) abrirFicha(pnb.dataset.pneu); });
+  $("#b-voltar-lista").addEventListener("click", () => { pneuAberto = null; tagAberta = null; $("#ctrl-lista").hidden = false; $("#ctrl-detalhe").hidden = true; renderCtrl(); });
 
   function textoSaiu(sa) {
     if (!sa || (sa.recapagens === null || sa.recapagens === undefined) && !sa.condicao) return "";
