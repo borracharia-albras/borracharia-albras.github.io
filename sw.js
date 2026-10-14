@@ -1,6 +1,6 @@
 /* Service worker: guarda o app no tablet para abrir sem internet
    e busca sempre a versão mais nova quando há internet. */
-const VERSAO = "borracharia-v10";
+const VERSAO = "borracharia-v12";
 const ARQUIVOS = ["./", "index.html", "app.js", "firebase.js", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png", "icons/favicon.png"];
 

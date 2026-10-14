@@ -100,6 +100,9 @@
   .ficha-eventos div{grid-template-columns:1fr}
   .ficha-eventos small{grid-column:1}
 }
+
+/* v11: pátio */
+.selo.st-patio{background:var(--brand-soft);color:var(--ink)}
 </style>
 </head>
 <body>
@@ -435,8 +438,8 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
         <span class="rotulo">Recapagens <span class="opc">(0 = pneu novo)</span></span>
         <div class="opcoes num" id="c-recap"><button data-v="0">0 · Novo</button><button data-v="1">1ª</button><button data-v="2">2ª</button><button data-v="3">3ª</button><button data-v="4">4ª</button><button data-v="5">5ª</button><button data-v="6">6ª</button><button data-v="7">7ª</button><button data-v="8">8ª</button><button data-v="9">9ª</button><button data-v="10">10ª</button></div>
         <span class="rotulo">Onde o pneu está agora</span>
-        <div class="opcoes" id="c-situacao"><button data-v="estoque" aria-pressed="true">Estoque</button><button data-v="recapagem">Na recapagem</button><button data-v="conserto">No conserto</button></div>
-        <p class="dica">Pneu que está montado num equipamento não precisa cadastrar aqui: na hora da troca, use “Gerar TAG nova” no pneu que saiu.</p>
+        <div class="opcoes" id="c-situacao"><button data-v="estoque" aria-pressed="true">Estoque (novo)</button><button data-v="patio">Pátio (usado)</button></div>
+        <p class="dica">Estoque guarda os pneus novos; Pátio guarda os usados (recapados ou consertados) prontos para montar. Pneu que está montado num equipamento não precisa cadastrar aqui: na hora da troca, use “Gerar TAG nova” no pneu que saiu.</p>
       </div>
       <div id="pend-cad"></div>
       <button class="btn-salvar" id="b-cadastrar">Cadastrar e gerar TAG</button>
@@ -445,15 +448,15 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
     <div id="cad-atualizar" hidden>
       <div class="cartao">
         <h3>Qual pneu?</h3>
-        <label class="rotulo" for="a-tag">TAG escrita no pneu</label>
-        <input class="campo campo-tag" id="a-tag" placeholder="ex.: AL015" autocomplete="off">
+        <label class="rotulo" for="a-tag">Número da TAG marcado no pneu</label>
+        <input class="campo campo-tag" id="a-tag" placeholder="ex.: 015" inputmode="numeric" autocomplete="off">
         <div id="a-ficha"></div>
       </div>
       <div class="cartao" id="a-campos" hidden>
         <h3>Atualizar</h3>
         <span class="rotulo">Onde o pneu está agora</span>
-        <div class="opcoes" id="a-situacao"><button data-v="estoque">Estoque</button><button data-v="recapagem">Na recapagem</button><button data-v="conserto">No conserto</button><button data-v="sucata">Sucata</button></div>
-        <span class="rotulo">Recapagens <span class="opc">(se voltou da recapadora, aumente aqui)</span></span>
+        <div class="opcoes" id="a-situacao"><button data-v="estoque">Estoque (novo)</button><button data-v="patio">Pátio (usado)</button><button data-v="recapagem">Foi para recapagem</button><button data-v="conserto">Foi para conserto</button><button data-v="sucata">Sucata</button></div>
+        <span class="rotulo">Recapagens <span class="opc">(voltou da recapadora? marque Pátio que a recapagem sobe sozinha)</span></span>
         <div class="opcoes num" id="a-recap"><button data-v="0">0 · Novo</button><button data-v="1">1ª</button><button data-v="2">2ª</button><button data-v="3">3ª</button><button data-v="4">4ª</button><button data-v="5">5ª</button><button data-v="6">6ª</button><button data-v="7">7ª</button><button data-v="8">8ª</button><button data-v="9">9ª</button><button data-v="10">10ª</button></div>
         <label class="rotulo" for="a-obs">Observação <span class="opc">(opcional)</span></label>
         <input class="campo" id="a-obs" autocomplete="off">
@@ -466,8 +469,8 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
   <!-- TELA: TAG GERADA -->
   <section id="t-tag" hidden>
     <div class="salvo">
-      <p class="tag-rot">Escreva esta TAG no pneu com o marcador</p>
-      <div class="tag-grande" id="tg-tag">AL000</div>
+      <p class="tag-rot">Marque no pneu o símbolo da Albras e este número</p>
+      <div class="tag-grande" id="tg-tag">000</div>
       <p id="tg-resumo"></p>
       <div class="linha-botoes">
         <button class="btn-sec" id="b-cad-outro">Cadastrar outro pneu</button>
@@ -567,7 +570,7 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
   </form>
 </div>
 
-<script type="module" src="app.js?v=10"></script>
+<script type="module" src="app.js?v=12"></script>
 <script>
 if ("serviceWorker" in navigator) {
   const tinhaVersao = !!navigator.serviceWorker.controller;

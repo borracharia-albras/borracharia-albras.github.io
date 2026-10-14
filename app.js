@@ -98,14 +98,17 @@ function conectarFirebase(aoConectar, aoFalhar) {
 
   /* ---------- TAG e pneus ---------- */
   function fmtTag(n) {
-    if (n <= 999) return "AL" + String(n).padStart(3, "0");
+    /* 001 a 999; depois 1-001 … 9-999 (o símbolo da Albras é marcado à parte no pneu) */
+    if (n <= 999) return String(n).padStart(3, "0");
     const k = n - 1000;
-    return "AL" + String.fromCharCode(65 + Math.floor(k / 999)) + String((k % 999) + 1).padStart(3, "0");
+    return (1 + Math.floor(k / 999)) + "-" + String((k % 999) + 1).padStart(3, "0");
   }
   function normTag(v) {
-    let s = String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-    if (/^\d{1,3}$/.test(s)) s = "AL" + s.padStart(3, "0");
-    return s;
+    const d = String(v || "").replace(/\D/g, "");
+    if (!d) return "";
+    if (d.length <= 3) return d.padStart(3, "0");
+    if (d.length === 4) return d[0] + "-" + d.slice(1);
+    return d;
   }
   function pneuPorTag(tag) {
     if (!tag) return null;
@@ -123,7 +126,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const s = norm(serie); if (!s) return null;
     return todosPneus().find((p) => norm(p.serie) === s) || null;
   }
-  const NOME_STATUS = { estoque: "Em estoque", montado: "Montado", recapagem: "Na recapagem", conserto: "No conserto", sucata: "Sucata" };
+  const NOME_STATUS = { estoque: "Estoque (novo)", patio: "Pátio (usado)", montado: "Montado", recapagem: "Na recapagem", conserto: "No conserto", sucata: "Sucata" };
   function textoStatus(pn) {
     if (!pn) return "";
     if (pn.status === "montado" && pn.local) return "Montado em " + pn.local.equipTag + " · eixo " + pn.local.eixo + " " + String(pn.local.lado || "").toLowerCase() + (pn.local.posicao ? " " + pn.local.posicao.toLowerCase() : "");
@@ -303,7 +306,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     eixo: Array.from({ length: 16 }, (_, k) => [String(k + 1), String(k + 1)]),
     lado: [["Direito", "Direito"], ["Esquerdo", "Esquerdo"]],
     posicao: [["Interno", "Interno"], ["Externo", "Externo"]],
-    destino: [["Conserto", "Conserto"], ["Recapagem", "Recapagem"], ["Estoque", "Estoque"], ["Sucata", "Sucata"]],
+    destino: [["Conserto", "Conserto"], ["Recapagem", "Recapagem"], ["Pátio", "Pátio"], ["Sucata", "Sucata"]],
     condicao: [["Novo", "Novo"], ["Recapado", "Recapado"]],
     saiuCondicao: [["Novo", "Novo"], ["Recapado", "Recapado"]],
     recapagens: [["0", "0 · Novo"], ["1", "1ª"], ["2", "2ª"], ["3", "3ª"], ["4", "4ª"], ["5", "5ª"], ["6", "6ª"], ["7", "7ª"], ["8", "8ª"], ["9", "9ª"], ["10", "10ª"]],
@@ -333,7 +336,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const tag = normTag(p[lado + "Tag"]);
     const gerar = '<button class="btn-gerar" data-acao="gerar" data-lado="' + lado + '">' + (tag ? "Gerar TAG nova" : "Pneu sem TAG? Gerar TAG nova") + "</button>";
     if (!tag) return gerar;
-    if (p[lado + "TagNova"] === tag) return '<div class="tag-nova"><span>TAG nova</span><b>' + esc(tag) + "</b><small>Escreva no pneu com o marcador</small></div>";
+    if (p[lado + "TagNova"] === tag) return '<div class="tag-nova"><span>TAG nova</span><b>' + esc(tag) + "</b><small>Marque no pneu: símbolo da Albras + este número</small></div>";
     const pn = pneuPorTag(tag);
     if (!pn) return '<div class="tag-erro">A TAG ' + esc(tag) + " não está cadastrada. Confira o que está escrito no pneu.</div>" + gerar;
     let aviso = "";
@@ -377,14 +380,14 @@ function conectarFirebase(aoConectar, aoFalhar) {
       sug +
       '<div class="par" style="margin-top:18px">' +
         '<section class="saiu"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Pneu que saiu</h4>' +
-          '<span class="rotulo">TAG do pneu</span>' + entrada("saiuTag", p.saiuTag, "TAG do pneu que saiu", ' placeholder="ex.: AL015"') +
+          '<span class="rotulo">TAG do pneu</span>' + entrada("saiuTag", p.saiuTag, "TAG do pneu que saiu", ' placeholder="ex.: 015" inputmode="numeric"') +
           '<div class="tag-status" data-tagstatus="saiu">' + htmlTagStatus(p, "saiu") + "</div>" +
           '<span class="rotulo">Nº de série</span>' + entrada("saiuSerie", p.saiuSerie, "Nº de série do pneu que saiu") +
           '<span class="rotulo">Recapagens <span class="opc">(0 = nunca foi recapado)</span></span>' + grupo("saiuRecapagens", p.saiuRecapagens) +
           '<span class="rotulo">Destino</span>' + grupo("destino", p.destino) +
         "</section>" +
         '<section class="entrou"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Pneu que entrou</h4>' +
-          '<span class="rotulo">TAG do pneu</span>' + entrada("entrouTag", p.entrouTag, "TAG do pneu que entrou", ' placeholder="ex.: AL015"') +
+          '<span class="rotulo">TAG do pneu</span>' + entrada("entrouTag", p.entrouTag, "TAG do pneu que entrou", ' placeholder="ex.: 015" inputmode="numeric"') +
           '<div class="tag-status" data-tagstatus="entrou">' + htmlTagStatus(p, "entrou") + "</div>" +
           '<span class="rotulo">Nº de série</span>' + entrada("entrouSerie", p.entrouSerie, "Nº de série do pneu que entrou") +
           '<span class="rotulo">Tipo de pneu (medida)</span>' + entrada("medida", p.medida, "Tipo de pneu (medida)", ' list="medidas" placeholder="ex.: 295/80 R22.5"') +
@@ -621,7 +624,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     LS.set("medidas", med.slice(0, 30));
     regs.forEach((r) => fila.push({ id: chamadoId + "-" + r.pneuNumero, data: r }));
     /* estoque: o pneu que saiu vai para o destino; o que entrou fica montado */
-    const STATUS_DESTINO = { Conserto: "conserto", Recapagem: "recapagem", Estoque: "estoque", Sucata: "sucata" };
+    const STATUS_DESTINO = { Conserto: "conserto", Recapagem: "recapagem", "Pátio": "patio", Estoque: "patio", Sucata: "sucata" };
     regs.forEach((r) => {
       const pos = "eixo " + r.posicao.eixo + " " + r.posicao.lado.toLowerCase() + (r.posicao.posicao ? " " + r.posicao.posicao.toLowerCase() : "");
       const velhoS = pneuPorTag(r.saiu.tagPneu);
@@ -671,12 +674,12 @@ function conectarFirebase(aoConectar, aoFalhar) {
     });
   }
   function marcar(sel, v) { $$(sel + " button").forEach((x) => x.setAttribute("aria-pressed", String(v !== null && v !== undefined && x.dataset.v === String(v)))); }
-  grupoSimples("#c-recap", (v) => { C.recap = v; });
+  grupoSimples("#c-recap", (v) => { C.recap = v; C.situacao = Number(v) === 0 ? "estoque" : "patio"; marcar("#c-situacao", C.situacao); });
   grupoSimples("#c-situacao", (v) => { C.situacao = v; });
   grupoSimples("#a-situacao", (v) => {
     C.aSituacao = v;
     const pn = C.aTag && pneuPorTag(C.aTag);
-    if (pn && pn.status === "recapagem" && v !== "recapagem" && v !== "sucata" && Number(C.aRecap) === Number(pn.recapagens)) {
+    if (pn && pn.status === "recapagem" && (v === "patio" || v === "estoque") && Number(C.aRecap) === Number(pn.recapagens)) {
       C.aRecap = Math.min(10, (Number(pn.recapagens) || 0) + 1); marcar("#a-recap", C.aRecap);
       $("#pend-atu").innerHTML = '<div class="tag-aviso">Voltou da recapagem: marcado como ' + C.aRecap + "ª recapagem. Confira.</div>";
     }
@@ -913,21 +916,21 @@ function conectarFirebase(aoConectar, aoFalhar) {
       box.innerHTML = '<div class="vazio">Nenhum pneu cadastrado ainda.<br>Os pneus aparecem aqui quando o borracheiro cadastra no tablet (“Cadastrar ou atualizar pneu”) ou gera uma TAG na hora da troca.</div>';
       return;
     }
-    const ordem = ["estoque", "montado", "recapagem", "conserto", "sucata"];
+    const ordem = ["estoque", "patio", "montado", "recapagem", "conserto", "sucata"];
     const cont = {}; ordem.forEach((s) => (cont[s] = 0)); todos.forEach((p) => (cont[p.status] = (cont[p.status] || 0) + 1));
     const chips = '<div class="status-chips" id="chips-status"><button data-st="" aria-pressed="' + (!filtroStatus) + '"><b>' + todos.length + "</b><span>Todos</span></button>" +
       ordem.map((s) => '<button data-st="' + s + '" aria-pressed="' + (filtroStatus === s) + '"><b>' + cont[s] + "</b><span>" + NOME_STATUS[s] + "</span></button>").join("") + "</div>";
-    const est = todos.filter((p) => p.status === "estoque");
+    const prontos = todos.filter((p) => p.status === "estoque" || p.status === "patio");
     const porMed = {};
-    est.forEach((p) => { const m = p.medida || "Sem medida"; porMed[m] = porMed[m] || { n: 0, novos: 0, rec: 0 }; porMed[m].n++; if (Number(p.recapagens) === 0) porMed[m].novos++; else porMed[m].rec++; });
+    prontos.forEach((p) => { const m = p.medida || "Sem medida"; porMed[m] = porMed[m] || { n: 0, est: 0, pat: 0 }; porMed[m].n++; if (p.status === "estoque") porMed[m].est++; else porMed[m].pat++; });
     const meds = Object.keys(porMed).sort();
-    const tabela = meds.length ? '<div class="tabela-medidas"><table><thead><tr><th>Em estoque por medida</th><th style="text-align:right">Total</th><th style="text-align:right">Novos</th><th style="text-align:right">Recapados</th></tr></thead><tbody>' +
-      meds.map((m) => "<tr><td>" + esc(m) + '</td><td class="n">' + porMed[m].n + '</td><td class="n">' + porMed[m].novos + '</td><td class="n">' + porMed[m].rec + "</td></tr>").join("") + "</tbody></table></div>" : "";
+    const tabela = meds.length ? '<div class="tabela-medidas"><table><thead><tr><th>Prontos para montar, por medida</th><th style="text-align:right">Estoque (novos)</th><th style="text-align:right">Pátio (usados)</th><th style="text-align:right">Total</th></tr></thead><tbody>' +
+      meds.map((m) => "<tr><td>" + esc(m) + '</td><td class="n">' + porMed[m].est + '</td><td class="n">' + porMed[m].pat + '</td><td class="n">' + porMed[m].n + "</td></tr>").join("") + "</tbody></table></div>" : "";
     const lista = todos.filter((p) => (!filtroStatus || p.status === filtroStatus) &&
       (!q || [p.tag, p.serie, p.medida, p.marca, p.local && p.local.equipTag].some((v) => norm(v).includes(q))))
       .sort((a, b) => String(a.tag).localeCompare(String(b.tag), "pt-BR", { numeric: true }));
     $("#resumo-ctrl").textContent = todos.length + (todos.length === 1 ? " pneu cadastrado" : " pneus cadastrados") + (filtroStatus || q ? " · mostrando " + lista.length : "");
-    box.innerHTML = chips + (filtroStatus && filtroStatus !== "estoque" ? "" : tabela) +
+    box.innerHTML = chips + (filtroStatus && filtroStatus !== "estoque" && filtroStatus !== "patio" ? "" : tabela) +
       (lista.length ? '<div class="lista-pneus-est">' + lista.map((p) =>
         '<button data-pneu="' + esc(p.tag) + '"><span class="tg">' + esc(p.tag) + '</span><span class="md"><strong>' + esc(p.medida || "Medida não informada") + (p.marca ? " · " + esc(p.marca) : "") + "</strong><small>Série " + esc(p.serie || "—") + " · " + esc(textoRecap(p.recapagens) || "recapagens não informadas") + "</small></span>" +
         '<span class="selo st-' + esc(p.status) + '">' + esc(p.status === "montado" && p.local ? "Montado · " + p.local.equipTag : NOME_STATUS[p.status] || "?") + "</span></button>").join("") + "</div>"
