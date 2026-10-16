@@ -145,12 +145,24 @@ function conectarFirebase(aoConectar, aoFalhar) {
   }
   async function gerarTag(codigo) {
     if (!TIPOS_MAP[codigo]) throw new Error("tipo");
-    if (!(reservaTags[codigo] || []).length) { try { await garantirReserva(1, codigo); } catch (e) {} }
+    let erro = null;
+    if (!(reservaTags[codigo] || []).length) { try { await garantirReserva(1, codigo); } catch (e) { erro = e; } }
     const lista = reservaTags[codigo] || [];
-    if (!lista.length) throw new Error("sem-reserva");
+    if (!lista.length) {
+      const cod = (erro && erro.code) || (!navigator.onLine ? "offline" : !db ? "sem-banco" : "desconhecido");
+      const er = new Error("sem-reserva"); er.code = cod; throw er;
+    }
     const n = lista.shift(); reservaTags[codigo] = lista; LS.set("reservaTipos", reservaTags);
     garantirReserva(3, codigo).catch(() => {});
     return fmtTag(n, codigo);
+  }
+  function msgErroTag(er, cod) {
+    if (er && er.message === "esgotado") return "Os 1.000 números do tipo " + cod + " já foram usados.";
+    const c = er && er.code;
+    if (c === "permission-denied") return "O Firebase recusou gerar a marcação (sem permissão). As regras novas do Firestore precisam ser publicadas.";
+    if (c === "offline" || c === "timeout" || c === "unavailable") return "Sem internet para gerar a marcação agora. Conecte o tablet e tente de novo.";
+    if (c === "sem-banco") return "O app ainda está conectando ao banco. Espere alguns segundos e tente de novo.";
+    return "Não foi possível gerar a marcação agora (" + (c || "erro") + "). Tente de novo em alguns segundos.";
   }
   function evento(texto, extra) {
     return Object.assign({ data: new Date().toISOString(), texto, por: usuario ? usuario.nome : "" }, extra || {});
@@ -438,7 +450,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
         if (lado === "entrou") p.medida = TIPOS_MAP[cod].medida;
         renderPneu(i);
       }).catch((er) => {
-        if (box) box.innerHTML = '<div class="tag-erro">' + (er && er.message === "esgotado" ? "Os 1.000 números do tipo " + cod + " já foram usados." : "Sem internet para gerar a marcação agora. Conecte o tablet e toque de novo.") + "</div>" + htmlTagStatus(p, lado);
+        if (box) box.innerHTML = '<div class="tag-erro">' + esc(msgErroTag(er, cod)) + "</div>" + htmlTagStatus(p, lado);
       });
       return;
     }
@@ -751,7 +763,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     let tag;
     try { tag = await gerarTag(tipo.codigo); }
     catch (e) {
-      $("#pend-cad").innerHTML = '<div class="pendencias">' + (e && e.message === "esgotado" ? "Os 1.000 números do tipo " + tipo.codigo + " já foram usados." : "Sem internet para gerar a marcação agora. Conecte o tablet e tente de novo.") + "</div>";
+      $("#pend-cad").innerHTML = '<div class="pendencias">' + esc(msgErroTag(e, tipo.codigo)) + "</div>";
       btn.disabled = false; btn.textContent = "Cadastrar e gerar TAG"; return;
     }
     btn.disabled = false; btn.textContent = "Cadastrar e gerar TAG";
