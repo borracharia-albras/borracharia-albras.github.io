@@ -47,73 +47,6 @@
 .opcoes.eixos{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}
 .opcoes.eixos button{min-width:0;padding:8px 0}
 @media (max-width:640px){.opcoes.eixos{grid-template-columns:repeat(4,minmax(0,1fr))}}
-
-/* v9: TAG e estoque de pneus */
-.btn-grande.sec{background:var(--surface);color:var(--brand);border:3px solid var(--brand);min-height:84px;font-size:24px}
-.btn-grande.sec svg{width:34px;height:34px}
-.campo-tag{text-transform:uppercase;font-family:var(--f-titulo);font-size:26px;letter-spacing:.06em}
-[data-pinput="saiuTag"],[data-pinput="entrouTag"]{text-transform:uppercase;font-family:var(--f-titulo);font-size:24px;letter-spacing:.06em}
-.tag-status{margin-top:8px}
-.btn-gerar{width:100%;min-height:52px;border:2px dashed var(--brand);border-radius:12px;background:var(--brand-soft);color:var(--brand);font-weight:700;font-size:15px;letter-spacing:.03em;text-transform:uppercase;padding:6px 12px}
-.tag-ok,.tag-erro,.tag-nova,.tag-aviso{border-radius:12px;padding:10px 14px;font-size:15px;line-height:1.35}
-.tag-ok{background:var(--ok-bg);color:var(--ink)}
-.tag-ok b{color:var(--ok);font-family:var(--f-titulo);font-size:20px;letter-spacing:.04em}
-.tag-ok small{display:block;color:var(--muted);font-weight:600;margin-top:2px}
-.tag-erro{background:var(--erro-bg);color:var(--erro);font-weight:600;margin-bottom:8px}
-.tag-aviso{margin-top:6px;background:var(--surface);border:2px solid var(--amarelo);color:var(--ink);font-weight:600}
-.tag-nova{background:var(--amarelo);color:var(--amarelo-ink);display:grid;gap:2px;text-align:center}
-.tag-nova span{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.tag-nova b{font-family:var(--f-titulo);font-size:40px;letter-spacing:.08em;line-height:1}
-.tag-nova small{font-weight:600}
-.tag-rot{font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.tag-grande{font-family:var(--f-titulo);font-size:clamp(72px,18vw,140px);line-height:1;letter-spacing:.08em;background:var(--amarelo);color:var(--amarelo-ink);padding:18px 36px;border-radius:24px}
-.status-chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
-.status-chips button{min-height:56px;padding:6px 18px;border:2px solid var(--line);border-radius:14px;background:var(--surface);display:grid;justify-items:start;text-align:left}
-.status-chips button b{font-size:24px;color:var(--brand);font-variant-numeric:tabular-nums;line-height:1.1}
-.status-chips button span{font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
-.status-chips button[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft)}
-.tabela-medidas{margin-top:16px;overflow-x:auto}
-.tabela-medidas table{border-collapse:collapse;width:100%;min-width:420px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-variant-numeric:tabular-nums}
-.tabela-medidas th,.tabela-medidas td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line)}
-.tabela-medidas th{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.tabela-medidas td.n{text-align:right;font-weight:700}
-.lista-pneus-est{display:grid;gap:10px;margin-top:16px}
-.lista-pneus-est button{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px;display:grid;grid-template-columns:minmax(96px,auto) 1fr auto;gap:2px 16px;align-items:center}
-.lista-pneus-est .tg{font-family:var(--f-titulo);font-size:26px;letter-spacing:.04em}
-.lista-pneus-est .md{min-width:0}
-.lista-pneus-est .md strong{display:block}
-.lista-pneus-est .md small{color:var(--muted)}
-.selo.st-estoque{background:var(--ok-bg);color:var(--ok)}
-.selo.st-montado{background:var(--brand-soft);color:var(--brand)}
-.selo.st-recapagem,.selo.st-conserto{background:var(--amarelo);color:var(--amarelo-ink)}
-.selo.st-sucata{background:var(--erro-bg);color:var(--erro)}
-.ficha-eventos{display:grid;gap:0;margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:6px 18px}
-.ficha-eventos div{padding:12px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:150px 1fr;gap:4px 14px}
-.ficha-eventos div:last-child{border-bottom:0}
-.ficha-eventos time{color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
-.ficha-eventos small{grid-column:2;color:var(--muted)}
-.link-pneu{border:0;background:none;padding:0;color:var(--brand);font:inherit;font-weight:700;text-decoration:underline}
-.msg-ok{margin-top:18px;padding:14px 18px;border-radius:var(--r);background:var(--ok-bg);color:var(--ok);font-weight:700}
-@media (max-width:640px){
-  .lista-pneus-est button{grid-template-columns:1fr auto}
-  .lista-pneus-est .md{grid-column:1/-1;grid-row:2}
-  .ficha-eventos div{grid-template-columns:1fr}
-  .ficha-eventos small{grid-column:1}
-}
-
-/* v11: pátio */
-.selo.st-patio{background:var(--brand-soft);color:var(--ink)}
-
-/* v13: marcação nº do pneu + código do tipo */
-.opcoes.tipos{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
-.opcoes.tipos button{display:grid;justify-items:start;text-align:left;gap:0;padding:8px 14px;text-transform:none;letter-spacing:0}
-.opcoes.tipos button b{font-family:var(--f-titulo);font-size:24px;letter-spacing:.04em}
-.opcoes.tipos button span{font-size:14px;font-weight:600}
-.opcoes.tipos button[aria-pressed="true"] span{color:var(--brand-ink)}
-.gerar-box{display:grid;gap:8px;margin-top:6px}
-.gerar-box select{min-height:52px;font-size:16px}
-.tag-tipo{margin:0;font-weight:700;font-size:20px}
-.tag-dica{font-size:14px;color:var(--muted);margin:4px 0 8px}
 </style>
 </head>
 <body>
@@ -322,10 +255,6 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
         <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="currentColor"/><path d="M16 12l12 8-12 8z" fill="var(--brand)"/></svg>
         Iniciar registro<br>de troca
       </button>
-      <button class="btn-grande sec" id="b-pneus">
-        <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="20" cy="20" r="7" fill="currentColor"/></svg>
-        Cadastrar ou<br>atualizar pneu
-      </button>
       <button class="link-discreto" id="b-controlador">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
         Entrar como controlador
@@ -425,72 +354,6 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
     <button class="btn-salvar" id="b-salvar">Salvar registro</button>
   </section>
 
-  <!-- TELA: PNEUS (cadastro / atualização) -->
-  <section id="t-pneus" hidden>
-    <header class="topo">
-      <button class="icone-btn" id="b-sair-pneus" aria-label="Sair"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <h1>Pneus e estoque<span class="quem" id="quem-pneus"></span></h1>
-      <span class="vazio-48"></span>
-    </header>
-    <div class="abas" id="abas-pneus" role="group" aria-label="O que fazer">
-      <button data-modo="novo" aria-pressed="true">Pneu sem TAG</button>
-      <button data-modo="atualizar" aria-pressed="false">Pneu com TAG</button>
-    </div>
-
-    <div id="cad-novo">
-      <div class="cartao" id="c-cad">
-        <h3>Cadastrar pneu e gerar TAG</h3>
-        <label class="rotulo" for="c-serie">Nº de série</label>
-        <input class="campo" id="c-serie" autocomplete="off">
-        <span class="rotulo">Tipo de pneu <span class="opc">(código da legenda)</span></span>
-        <div class="opcoes tipos" id="c-tipo"><button data-v="295"><b>295</b><span>295.80 - 22,5 Borrachudo</span></button><button data-v="296"><b>296</b><span>295.80 - 22,5 Direcional</span></button><button data-v="275"><b>275</b><span>275.80 - 22,5</span></button><button data-v="122"><b>122</b><span>1100.R - 22</span></button><button data-v="120"><b>120</b><span>1100R.20</span></button><button data-v="716"><b>716</b><span>7.50 - 16</span></button><button data-v="715"><b>715</b><span>7.50 - 15</span></button><button data-v="830"><b>830</b><span>18.4 - 30</span></button><button data-v="834"><b>834</b><span>18.4 - 34</span></button><button data-v="235"><b>235</b><span>235/75 - 17,5</span></button><button data-v="205"><b>205</b><span>20.5 - 25</span></button><button data-v="124"><b>124</b><span>12.4 - 24</span></button><button data-v="508"><b>508</b><span>5.00-8 Pneumático</span></button><button data-v="580"><b>580</b><span>5.00-8 Maciço</span></button><button data-v="186"><b>186</b><span>18.6.12 1/8 Maciço</span></button><button data-v="289"><b>289</b><span>28.9-15 Maciço</span></button><button data-v="650"><b>650</b><span>6.50-10 Maciço</span></button><button data-v="250"><b>250</b><span>250-15 Maciço</span></button><button data-v="300"><b>300</b><span>300-15 Maciço</span></button><button data-v="355"><b>355</b><span>355/50-20 Maciço</span></button><button data-v="351"><b>351</b><span>355.50-15 Maciço</span></button><button data-v="365"><b>365</b><span>355/65-15 Maciço</span></button><button data-v="700"><b>700</b><span>7.00-12 Maciço</span></button><button data-v="825"><b>825</b><span>8.25-15 Maciço</span></button><button data-v="228"><b>228</b><span>22.8-16 Maciço</span></button></div>
-        <label class="rotulo" for="c-marca">Marca <span class="opc">(opcional)</span></label>
-        <input class="campo" id="c-marca" autocomplete="off">
-        <span class="rotulo">Recapagens <span class="opc">(0 = pneu novo)</span></span>
-        <div class="opcoes num" id="c-recap"><button data-v="0">0 · Novo</button><button data-v="1">1ª</button><button data-v="2">2ª</button><button data-v="3">3ª</button><button data-v="4">4ª</button><button data-v="5">5ª</button><button data-v="6">6ª</button><button data-v="7">7ª</button><button data-v="8">8ª</button><button data-v="9">9ª</button><button data-v="10">10ª</button></div>
-        <span class="rotulo">Onde o pneu está agora</span>
-        <div class="opcoes" id="c-situacao"><button data-v="estoque" aria-pressed="true">Estoque (novo)</button><button data-v="patio">Pátio (usado)</button></div>
-        <p class="dica">Estoque guarda os pneus novos; Pátio guarda os usados (recapados ou consertados) prontos para montar. Pneu que está montado num equipamento não precisa cadastrar aqui: na hora da troca, use “Gerar TAG nova” no pneu que saiu.</p>
-      </div>
-      <div id="pend-cad"></div>
-      <button class="btn-salvar" id="b-cadastrar">Cadastrar e gerar TAG</button>
-    </div>
-
-    <div id="cad-atualizar" hidden>
-      <div class="cartao">
-        <h3>Qual pneu?</h3>
-        <label class="rotulo" for="a-tag">Marcação do pneu (nº do pneu + código do tipo)</label>
-        <input class="campo campo-tag" id="a-tag" placeholder="ex.: 001 275" inputmode="numeric" autocomplete="off">
-        <div id="a-ficha"></div>
-      </div>
-      <div class="cartao" id="a-campos" hidden>
-        <h3>Atualizar</h3>
-        <span class="rotulo">Onde o pneu está agora</span>
-        <div class="opcoes" id="a-situacao"><button data-v="estoque">Estoque (novo)</button><button data-v="patio">Pátio (usado)</button><button data-v="recapagem">Foi para recapagem</button><button data-v="conserto">Foi para conserto</button><button data-v="sucata">Sucata</button></div>
-        <span class="rotulo">Recapagens <span class="opc">(voltou da recapadora? marque Pátio que a recapagem sobe sozinha)</span></span>
-        <div class="opcoes num" id="a-recap"><button data-v="0">0 · Novo</button><button data-v="1">1ª</button><button data-v="2">2ª</button><button data-v="3">3ª</button><button data-v="4">4ª</button><button data-v="5">5ª</button><button data-v="6">6ª</button><button data-v="7">7ª</button><button data-v="8">8ª</button><button data-v="9">9ª</button><button data-v="10">10ª</button></div>
-        <label class="rotulo" for="a-obs">Observação <span class="opc">(opcional)</span></label>
-        <input class="campo" id="a-obs" autocomplete="off">
-      </div>
-      <div id="pend-atu"></div>
-      <button class="btn-salvar" id="b-atualizar" hidden>Salvar alteração</button>
-    </div>
-  </section>
-
-  <!-- TELA: TAG GERADA -->
-  <section id="t-tag" hidden>
-    <div class="salvo">
-      <p class="tag-rot">Marque no pneu: símbolo da Albras + nº do pneu + código do tipo</p>
-      <div class="tag-grande" id="tg-tag">000 000</div>
-      <p class="tag-tipo" id="tg-tipo"></p>
-      <p id="tg-resumo"></p>
-      <div class="linha-botoes">
-        <button class="btn-sec" id="b-cad-outro">Cadastrar outro pneu</button>
-        <button class="btn-sec" id="b-cad-sair">Sair</button>
-      </div>
-    </div>
-  </section>
-
   <!-- TELA: SALVO -->
   <section id="t-salvo" hidden>
     <div class="salvo">
@@ -530,7 +393,6 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
       <div class="abas" id="abas-ctrl" role="group" aria-label="Como mostrar o histórico">
         <button data-vista="data" aria-pressed="true">Por data</button>
         <button data-vista="equip" aria-pressed="false">Por equipamento</button>
-        <button data-vista="estoque" aria-pressed="false">Estoque de pneus</button>
       </div>
       <div class="barra-busca">
         <div class="busca">
@@ -550,7 +412,6 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
       <p class="resumo" id="resumo-ctrl"></p>
       <div id="lista-datas"></div>
       <div class="lista-equip" id="lista-equip" hidden></div>
-      <div id="lista-estoque" hidden></div>
     </div>
     <div id="ctrl-detalhe" hidden>
       <div style="margin-top:16px"><button class="btn-sec" id="b-voltar-lista">← Todos os equipamentos</button></div>
@@ -582,7 +443,7 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
   </form>
 </div>
 
-<script type="module" src="app.js?v=15"></script>
+<script type="module" src="app.js?v=16"></script>
 <script>
 if ("serviceWorker" in navigator) {
   const tinhaVersao = !!navigator.serviceWorker.controller;
