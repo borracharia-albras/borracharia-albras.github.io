@@ -18,7 +18,14 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Contador das TAGs: so pode aumentar, nunca voltar
+    // Contador de numeracao por tipo de pneu: so pode aumentar, nunca voltar
+    match /contadores/{codigo} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.ultimo is int;
+      allow update: if request.auth != null && request.resource.data.ultimo > resource.data.ultimo;
+    }
+
+    // Contador antigo (nao usado mais)
     match /config/contadorTag {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.resource.data.ultimo is int;

@@ -1,4 +1,4 @@
-import { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, onSnapshot, collection, query, where, orderBy, limit, getDocs } from "./firebase.js";
+import { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, onSnapshot, collection, query, where, orderBy, limit, getDocs, runTransaction } from "./firebase.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBGWkju71fECEfizymK9dU0v_Wi6IAV0lU",
@@ -8,6 +8,10 @@ const firebaseConfig = {
   messagingSenderId: "519309613823",
   appId: "1:519309613823:web:d445b38f76ae64d94bcaca"
 };
+
+/* Legenda de tipos de pneu (marcação = nº do pneu 000–999 + código do tipo) */
+const TIPOS = [{"codigo": "295", "medida": "295.80 - 22,5 Borrachudo"}, {"codigo": "296", "medida": "295.80 - 22,5 Direcional"}, {"codigo": "275", "medida": "275.80 - 22,5"}, {"codigo": "122", "medida": "1100.R - 22"}, {"codigo": "120", "medida": "1100R.20"}, {"codigo": "716", "medida": "7.50 - 16"}, {"codigo": "715", "medida": "7.50 - 15"}, {"codigo": "830", "medida": "18.4 - 30"}, {"codigo": "834", "medida": "18.4 - 34"}, {"codigo": "235", "medida": "235/75 - 17,5"}, {"codigo": "205", "medida": "20.5 - 25"}, {"codigo": "124", "medida": "12.4 - 24"}, {"codigo": "508", "medida": "5.00-8 Pneumático"}, {"codigo": "580", "medida": "5.00-8 Maciço"}, {"codigo": "186", "medida": "18.6.12 1/8 Maciço"}, {"codigo": "289", "medida": "28.9-15 Maciço"}, {"codigo": "650", "medida": "6.50-10 Maciço"}, {"codigo": "250", "medida": "250-15 Maciço"}, {"codigo": "300", "medida": "300-15 Maciço"}, {"codigo": "355", "medida": "355/50-20 Maciço"}, {"codigo": "351", "medida": "355.50-15 Maciço"}, {"codigo": "365", "medida": "355/65-15 Maciço"}, {"codigo": "700", "medida": "7.00-12 Maciço"}, {"codigo": "825", "medida": "8.25-15 Maciço"}, {"codigo": "228", "medida": "22.8-16 Maciço"}];
+const TIPOS_MAP = Object.fromEntries(TIPOS.map((t) => [t.codigo, t]));
 
 /* Listas padrão (usadas até o Firestore responder, e se não houver versão no banco) */
 const EQUIP_PADRAO = [{"local": "80903054", "tag": "CE-91141", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "FAV"}, {"local": "80920615", "tag": "CO-91701", "descricao": "CAMINHAO BOMBEIRO", "familia": "Caminhão bombeiro", "area": "HSS"}, {"local": "80921550", "tag": "CO-91703", "descricao": "CAMINHAO BOMBEIRO", "familia": "Caminhão bombeiro", "area": "HSS"}, {"local": "80925228", "tag": "CE-91128", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Subestação"}, {"local": "80925625", "tag": "GE517001", "descricao": "GERADOR EMERG 2425KW TOSHIBA", "familia": "Gerador de emergência", "area": "Subestação"}, {"local": "80925626", "tag": "GE517002", "descricao": "GERADOR EMERG 2425KW TOSHIBA", "familia": "Gerador de emergência", "area": "Subestação"}, {"local": "80903053", "tag": "CE-91132", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Manutenção FAV"}, {"local": "80902209", "tag": "CE-91127", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "OCH"}, {"local": "80905455", "tag": "CE-91110", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Fundição"}, {"local": "80920519", "tag": "EP-91559", "descricao": "EMPILHADEIRA TOYOTA FSV 4.3(7T)", "familia": "Empilhadeira", "area": "Fundição"}, {"local": "80904458", "tag": "SH-91219", "descricao": "PA CARREGADEIRA 924G", "familia": "Pá carregadeira", "area": "Fundição"}, {"local": "80902205", "tag": "SH-91224", "descricao": "PA CARREGADEIRA 621D", "familia": "Pá carregadeira", "area": "Fundição"}, {"local": "80920550", "tag": "CE-91147", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Offline"}, {"local": "80920551", "tag": "CE-91148", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Offline"}, {"local": "80905441", "tag": "CE-91134", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Cadinho"}, {"local": "80905016", "tag": "CE-93733", "descricao": "CARRETA TRANSPORTE DE CADINHO", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80905017", "tag": "CE-93734", "descricao": "CARRETA TRANSPORTE DE CADINHO", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80905018", "tag": "CE-93735", "descricao": "CARRETA TRANSPORTE DE CADINHO", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80905019", "tag": "CE-93736", "descricao": "CARRETA TRANSPORTE DE CADINHO", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80905020", "tag": "CE-93737", "descricao": "CARRETA TRANSPORTE DE CADINHO", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80905021", "tag": "CE-93738", "descricao": "CARRETA TRANSPORTE DE CADINHO", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80921797", "tag": "CE-93739", "descricao": "CARRETA TRANSPORTE DE CCB", "familia": "Carretinha", "area": "Cadinho"}, {"local": "91048456", "tag": "CE-93740", "descricao": "CARRETA TRANSPORTE DE CCM 4,5", "familia": "Carretinha", "area": "Cadinho"}, {"local": "91048457", "tag": "CE-93741", "descricao": "CARRETA TRANSPORTE DE CCM 4,5", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80913114", "tag": "CE-91146", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Manutenção Redução"}, {"local": "80920620", "tag": "CE-91123", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Manutenção Redução"}, {"local": "80915377", "tag": "EP-91526", "descricao": "EMPILHADEIRA CLARK C55SD 5,5T", "familia": "Empilhadeira", "area": "Cadinho"}, {"local": "80913092", "tag": "CE-91113", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Offline"}, {"local": "80917019", "tag": "CE-91115", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Offline"}, {"local": "80935451", "tag": "CK-92334", "descricao": "CAVALO MECANICO VOLVO 520", "familia": "Cavalo mecânico", "area": "Offline"}, {"local": "91048453", "tag": "CK-92335", "descricao": "CAVALO MEC CONSTELLATION 19.330", "familia": "Cavalo mecânico", "area": "Offline"}, {"local": "80913138", "tag": "EP-91314", "descricao": "EMPILHADEIRA CLARK C45SD", "familia": "Empilhadeira", "area": "Offline"}, {"local": "80913130", "tag": "EP-91531", "descricao": "EMPILHADEIRA HYSTER H120FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80900601", "tag": "CE-91112", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Manutenção Preditiva"}, {"local": "80920648", "tag": "CE-91125", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Manutenção Preditiva"}, {"local": "80913134", "tag": "CE-11601", "descricao": "Carreta comboio lubrificação", "familia": "Carreta comboio", "area": "Manutenção Redução"}, {"local": "80913135", "tag": "CE-11602", "descricao": "Carreta comboio de manutenção", "familia": "Carreta comboio", "area": "Manutenção Redução"}, {"local": "80916359", "tag": "CE-13601", "descricao": "Carreta comboio lubrificação", "familia": "Carreta comboio", "area": "Manutenção Redução"}, {"local": "80916360", "tag": "CE-13602", "descricao": "Carreta comboio de manutenção", "familia": "Carreta comboio", "area": "Manutenção Redução"}, {"local": "80991540", "tag": "CE-13603", "descricao": "Nova Carreta Comboio Manut F1", "familia": "Carreta comboio", "area": "Manutenção Redução"}, {"local": "80913109", "tag": "TT-91483", "descricao": "TRATOR CAIXA MARCHA DE 2 VELO", "familia": "Trator de rodas", "area": "Manutenção Redução"}, {"local": "80916343", "tag": "TT-91481", "descricao": "TRATOR AGRALE", "familia": "Trator de rodas", "area": "Manutenção Redução"}, {"local": "80916348", "tag": "CE-91139", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Manutenção Redução"}, {"local": "80917004", "tag": "CE-91109", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Offline"}, {"local": "80916955", "tag": "CE-93525", "descricao": "REBOQUE PRANCHA SEST", "familia": "Carreta prancha", "area": "Offline"}, {"local": "80916652", "tag": "CE-93527", "descricao": "REBOQUE PRANCHA NICOLAS", "familia": "Carreta prancha", "area": "Offline"}, {"local": "80916810", "tag": "CE-93528", "descricao": "CARRETA TRT - OFFLINE", "familia": "Veículos especiais", "area": "Offline"}, {"local": "80920548", "tag": "CE-93532", "descricao": "Carreta prancha Trudel", "familia": "Carreta prancha", "area": "Offline"}, {"local": "80920549", "tag": "CE-93533", "descricao": "Carreta prancha Trudel", "familia": "Carreta prancha", "area": "Offline"}, {"local": "80917009", "tag": "CK-92124", "descricao": "CAMINHAO CARROC. FORD CARG", "familia": "Caminhão carroceria", "area": "Offline"}, {"local": "91048470", "tag": "EP-91548", "descricao": "EMPILHADEIRA TOYOTA FSV 4.3T", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80904456", "tag": "EP-91517", "descricao": "EMPILHADEIRA HYSTER S155XL2", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80905468", "tag": "EP-91529", "descricao": "EMPILHADEIRA HYSTER H155FT 7T", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80913129", "tag": "EP-91530", "descricao": "EMPILHADEIRA HYSTER H120FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80905474", "tag": "EP-91541", "descricao": "EMPILHADEIRA HYSTER H120FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80904451", "tag": "CE-91133", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "OCH"}, {"local": "80905467", "tag": "EP-91528", "descricao": "EMPILHADEIRA HYSTER H155FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80913131", "tag": "EP-91533", "descricao": "EMPILHADEIRA HYSTER H120FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80916357", "tag": "EP-91536", "descricao": "EMPILHADEIRA HYSTER H120FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "91048454", "tag": "EP-91546", "descricao": "EMPILHADEIRA HYSTER H5.5FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "91048455", "tag": "EP-91547", "descricao": "EMPILHADEIRA HYSTER H5.5FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80920520", "tag": "EP-91560", "descricao": "EMPILHADEIRA TOYOTA FSV (7T)", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80905418", "tag": "CE-93301", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80905419", "tag": "CE-93302", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80905420", "tag": "CE-93303", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80905421", "tag": "CE-93304", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80920588", "tag": "CE-93305", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80920589", "tag": "CE-93306", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80905422", "tag": "CE-93307", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "91048590", "tag": "CE-93308", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80905453", "tag": "CM-31208", "descricao": "TRATOR TERMINAL MAFI MT32", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905454", "tag": "CM-31209", "descricao": "TRATOR TERMINAL MAFI MT32", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905457", "tag": "CM-31210", "descricao": "TRATOR TERMINAL MAFI MT32", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905475", "tag": "CM-31211", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905476", "tag": "CM-31212", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905477", "tag": "CM-31213", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905479", "tag": "CM-31214", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905480", "tag": "CM-31215", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "91048465", "tag": "CM-31216", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "91048466", "tag": "CM-31217", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "80920631", "tag": "EP-91285", "descricao": "EMPILHADEIRA HYSTER H60XM 3T", "familia": "Empilhadeira", "area": "Logística"}, {"local": "80905469", "tag": "EP-91310", "descricao": "EMPILHADEIRA HYSTER H60FT 4T", "familia": "Empilhadeira", "area": "Fundição"}, {"local": "80913132", "tag": "EP-91312", "descricao": "EMPILHADEIRA HYSTER H90FT 4T", "familia": "Empilhadeira", "area": "Fundição"}, {"local": "80935257", "tag": "EP-91509", "descricao": "EMPILHADEIRA HYSTER S155XL2", "familia": "Empilhadeira", "area": "Fundição"}, {"local": "80904460", "tag": "EP-91513", "descricao": "EMPILHADEIRA HYSTER S155XL2", "familia": "Empilhadeira", "area": "Fundição"}, {"local": "80935454", "tag": "EP-91516", "descricao": "EMPILHADEIRA YALE S155XL2 7T", "familia": "Empilhadeira", "area": "Fundição"}, {"local": "80916351", "tag": "TT-91497", "descricao": "TRATOR DE RODAS", "familia": "Trator de rodas", "area": "Cadinho"}, {"local": "80905440", "tag": "VC-91629", "descricao": "VARREDEIRA ELETRICA 120DL", "familia": "Varredeira", "area": "Fundição"}, {"local": "80920640", "tag": "CE-91126", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Infraestrutura"}, {"local": "80920639", "tag": "CE-91124", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Oficina de Veículos"}, {"local": "80913095", "tag": "CE-91130", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Oficina de Veículos"}, {"local": "80920621", "tag": "CK-92117", "descricao": "CAMINHAO CARROCERIA", "familia": "Caminhão carroceria", "area": "Oficina de Veículos"}, {"local": "80903052", "tag": "CE-91117", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Oficinas de Hastes"}, {"local": "80905425", "tag": "CE-93408", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905426", "tag": "CE-93409", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905427", "tag": "CE-93410", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905428", "tag": "CE-93411", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905482", "tag": "CE-93416", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "91048560", "tag": "CE-93417", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905429", "tag": "CE-93412", "descricao": "SILO REBOCÁVEL - BLEND", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905430", "tag": "CE-93413", "descricao": "SILO REBOCÁVEL - BLEND", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905431", "tag": "CE-93414", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905481", "tag": "CE-93415", "descricao": "SILO REBOCÁVEL - BLEND", "familia": "Carreta silo", "area": "Logística"}, {"local": "80920590", "tag": "CE-93521", "descricao": "REBOQUE PRANCHA DE ANODO", "familia": "Carreta prancha", "area": "Logística"}, {"local": "80935453", "tag": "CE-93524", "descricao": "REBOQUE PRANCHA DE ANODO", "familia": "Carreta prancha", "area": "Logística"}, {"local": "91048468", "tag": "CE-93529", "descricao": "REBOQUE PRANCHA DE ANODO", "familia": "Carreta prancha", "area": "Logística"}, {"local": "91048469", "tag": "CE-93530", "descricao": "REBOQUE PRANCHA DE ANODO", "familia": "Carreta prancha", "area": "Logística"}, {"local": "80920515", "tag": "VC-91642", "descricao": "VARREDEIRA MECANICA DE SUCÇÃO", "familia": "Varredeira", "area": "Redução 3"}, {"local": "91048600", "tag": "TT-91500", "descricao": "Trator de rodas John Deere", "familia": "Trator de rodas", "area": "Redução 3"}, {"local": "91048602", "tag": "TT-91502", "descricao": "Trator de rodas John Deere", "familia": "Trator de rodas", "area": "Redução 4"}, {"local": "80913159", "tag": "CA-11101", "descricao": "VEÍCULO ALIMENTADOR DE ALUMINA", "familia": "Veículos especiais", "area": "Redução 1"}, {"local": "80916446", "tag": "VC-91643", "descricao": "VARREDEIRA HENCON", "familia": "Varredeira", "area": "Redução 3"}, {"local": "80920516", "tag": "CA-11102", "descricao": "VEÍCULO ALIMENTADOR DE ALUMINA", "familia": "Veículos especiais", "area": "Redução 1"}, {"local": "80905484", "tag": "EP-91316", "descricao": "EMPILHADEIRA HYSTER H60XT 3T", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80915133", "tag": "CE-93721", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 1"}, {"local": "80911934", "tag": "CE-93728", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 2"}, {"local": "80911935", "tag": "CE-93730", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 3"}, {"local": "80913122", "tag": "CE-93732", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 4"}, {"local": "80913127", "tag": "TT-91496", "descricao": "TRATOR DE RODAS", "familia": "Trator de rodas", "area": "Redução 1"}, {"local": "89920700", "tag": "TT-91498", "descricao": "TRATOR DE RODAS", "familia": "Trator de rodas", "area": "Redução 2"}, {"local": "91048601", "tag": "TT-91501", "descricao": "Trator de rodas John Deere", "familia": "Trator de rodas", "area": "Salão Operação Redução 1"}, {"local": "80913096", "tag": "CE-91136", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Redução 2"}, {"local": "80913097", "tag": "CE-91137", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Redução 2"}, {"local": "80911932", "tag": "CE-93722", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 1"}, {"local": "80915134", "tag": "CE-93723", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 2"}, {"local": "80915135", "tag": "CE-93724", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 3"}, {"local": "80913845", "tag": "CE-93725", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 4"}, {"local": "80913120", "tag": "CE-93729", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 1"}, {"local": "80910811", "tag": "TT-91486", "descricao": "TRATOR CAIXA MARCHA DE 2 VELO", "familia": "Trator de rodas", "area": "Redução 2"}, {"local": "80902215", "tag": "VC-91639", "descricao": "VARREDEIRA MECANICA 800D", "familia": "Varredeira", "area": "Redução 3"}, {"local": "80913846", "tag": "CE-93726", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 3"}, {"local": "80913859", "tag": "CK-92121", "descricao": "CAMINHAO SUGADOR FORD DIESEL", "familia": "Caminhão sugador", "area": "Manutenção Redução"}, {"local": "80905439", "tag": "TT-91406", "descricao": "TRATOR COM TRANSMISSAO SINCRO", "familia": "Trator de rodas", "area": "Manutenção Redução"}, {"local": "80916340", "tag": "TT-91487", "descricao": "TRATOR CAIXA MARCHA DE 2 VELO", "familia": "Trator de rodas", "area": "Redução 4"}, {"local": "80914036", "tag": "TT-91491", "descricao": "TRATOR AGRALE", "familia": "Trator de rodas", "area": "Redução 4"}, {"local": "80905483", "tag": "EP-91315", "descricao": "EMPILHADEIRA HYSTER H60XT 3T", "familia": "Empilhadeira", "area": "FAV"}, {"local": "80903061", "tag": "EP-91543", "descricao": "EMPILHADEIRA HYSTER H120FT 5T", "familia": "Empilhadeira", "area": "FAV"}, {"local": "80905555", "tag": "CE-93531", "descricao": "REBOQUE PRANCHA DE ANODO", "familia": "Carreta prancha", "area": "Logística"}, {"local": "91048474", "tag": "CK-92336", "descricao": "CAVALO MEC MAGNA RIOS", "familia": "Cavalo mecânico", "area": "Logística"}, {"local": "91048475", "tag": "CK-92337", "descricao": "CAVALO MEC MAGNA RIOS", "familia": "Cavalo mecânico", "area": "Logística"}, {"local": "91048476", "tag": "CK-92338", "descricao": "CAVALO MEC MAGNA RIOS", "familia": "Cavalo mecânico", "area": "Logística"}, {"local": "91048471", "tag": "EP-91549", "descricao": "EMPILHADEIRA TOYOTA FSV 4.3T", "familia": "Empilhadeira", "area": "Logística"}, {"local": "91048472", "tag": "EP-91550", "descricao": "EMPILHADEIRA TOYOTA FSV 4.3T", "familia": "Empilhadeira", "area": "Logística"}, {"local": "91048473", "tag": "EP-91551", "descricao": "EMPILHADEIRA TOYOTA FSV 4.3T", "familia": "Empilhadeira", "area": "Logística"}, {"local": "80920517", "tag": "EP-91557", "descricao": "EMPILHADEIRA TOYOTA FSV (7T)", "familia": "Empilhadeira", "area": "Logística"}, {"local": "80920518", "tag": "EP-91558", "descricao": "EMPILHADEIRA TOYOTA FSV (7T)", "familia": "Empilhadeira", "area": "Logística"}, {"local": "80930633", "tag": "CE-91111", "descricao": "Carro Elétrico", "familia": "Carro elétrico", "area": "Utilidades"}, {"local": "91048467", "tag": "CK-92128", "descricao": "CAMINHÃO VARREDEIRA COLPION", "familia": "Caminhão varredeira", "area": "Manutenção OCH"}, {"local": "91079143", "tag": "CK-92129", "descricao": "CAMINHÃO VARREDEIRA COLPION", "familia": "Caminhão varredeira", "area": "Manutenção OCH"}, {"local": "89912188", "tag": "GE7220002", "descricao": "GERADOR DE EMERGENCIA 230KW", "familia": "Gerador de emergência", "area": "Subestação"}];
@@ -36,11 +40,22 @@ function consulta(path, cons = []) {
 }
 function documento(path) {
   return {
-    set: (data) => comPrazo(setDoc(doc(fs, path), data), 15000),
+    set: (data, opts) => comPrazo(setDoc(doc(fs, path), data, opts || {}), 15000),
     onSnapshot: (next, err) => onSnapshot(doc(fs, path), (s) => next(embrulhaDoc(s)), err)
   };
 }
-const bancoFirebase = { doc: documento, collection: (p) => consulta(p) };
+const bancoFirebase = {
+  doc: documento,
+  collection: (p) => consulta(p),
+  /* reserva "qtd" números de TAG de uma vez, sem nunca repetir entre aparelhos */
+  reservarTags: (qtd, codigo) => comPrazo(runTransaction(fs, async (t) => {
+    const ref = doc(fs, "contadores", String(codigo));
+    const s = await t.get(ref);
+    const ultimo = s.exists() ? Number(s.data().ultimo) || 0 : 0;
+    t.set(ref, { ultimo: ultimo + qtd, atualizadoEm: new Date().toISOString() });
+    return ultimo;
+  }), 12000)
+};
 function conectarFirebase(aoConectar, aoFalhar) {
   onAuthStateChanged(auth, (u) => { if (u) aoConectar(bancoFirebase); });
   auth.authStateReady().then(() => { if (!auth.currentUser) signInAnonymously(auth).catch(aoFalhar); }).catch(aoFalhar);
@@ -68,6 +83,10 @@ function conectarFirebase(aoConectar, aoFalhar) {
   let assinaturaCtrl = null;
   let usuario = null;
   let timerSalvo = null;
+  let pneusMap = LS.get("pneus", {});
+  let reservaTags = LS.get("reservaTipos", {});
+  if (Array.isArray(reservaTags)) reservaTags = {};
+  let proximaTela = "registro";
 
   /* ---------- utilidades ---------- */
   const pad = (n) => String(n).padStart(2, "0");
@@ -82,8 +101,65 @@ function conectarFirebase(aoConectar, aoFalhar) {
     return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
   }
 
+  /* ---------- TAG e pneus ---------- */
+  /* marcação: "001 275" = pneu nº 001 do tipo 275. Igual ao livro de controle: cada tipo vai de 000 a 999, nessa ordem. */
+  function fmtTag(n, codigo) {
+    if (n > 1000) throw new Error("esgotado");
+    return String(n - 1).padStart(3, "0") + " " + codigo;
+  }
+  function normTag(v) {
+    const d = String(v || "").replace(/\D/g, "");
+    return d.length === 6 ? d.slice(0, 3) + " " + d.slice(3) : "";
+  }
+  const tipoDe = (tag) => (tag ? TIPOS_MAP[String(tag).slice(4)] || null : null);
+  const nomeTipo = (cod) => (TIPOS_MAP[cod] ? cod + " · " + TIPOS_MAP[cod].medida : cod);
+  function pneuPorTag(tag) {
+    if (!tag) return null;
+    let p = pneusMap[tag] ? Object.assign({}, pneusMap[tag]) : null;
+    fila.forEach((f) => { if (f.col === "pneus" && f.id === tag) p = Object.assign(p || {}, f.data); });
+    return p;
+  }
+  function todosPneus() {
+    const m = {};
+    Object.keys(pneusMap).forEach((t) => (m[t] = Object.assign({}, pneusMap[t])));
+    fila.forEach((f) => { if (f.col === "pneus") m[f.id] = Object.assign(m[f.id] || {}, f.data); });
+    return Object.values(m);
+  }
+  function pneuPorSerie(serie) {
+    const s = norm(serie); if (!s) return null;
+    return todosPneus().find((p) => norm(p.serie) === s) || null;
+  }
+  const NOME_STATUS = { estoque: "Estoque (novo)", patio: "Pátio (usado)", montado: "Montado", recapagem: "Na recapagem", conserto: "No conserto", sucata: "Sucata" };
+  function textoStatus(pn) {
+    if (!pn) return "";
+    if (pn.status === "montado" && pn.local) return "Montado em " + pn.local.equipTag + " · eixo " + pn.local.eixo + " " + String(pn.local.lado || "").toLowerCase() + (pn.local.posicao ? " " + pn.local.posicao.toLowerCase() : "");
+    return NOME_STATUS[pn.status] || "Situação desconhecida";
+  }
+  const textoRecap = (n) => (n === null || n === undefined || n === "" ? "" : Number(n) === 0 ? "0 recapagem" : Number(n) + "ª recapagem");
+  async function garantirReserva(min, codigo) {
+    const lista = reservaTags[codigo] || [];
+    if (lista.length >= min || !db || !navigator.onLine) return;
+    const ultimo = await db.reservarTags(10, codigo);
+    for (let k = 1; k <= 10; k++) if (ultimo + k <= 1000) lista.push(ultimo + k);
+    reservaTags[codigo] = lista; LS.set("reservaTipos", reservaTags);
+  }
+  async function gerarTag(codigo) {
+    if (!TIPOS_MAP[codigo]) throw new Error("tipo");
+    if (!(reservaTags[codigo] || []).length) { try { await garantirReserva(1, codigo); } catch (e) {} }
+    const lista = reservaTags[codigo] || [];
+    if (!lista.length) throw new Error("sem-reserva");
+    const n = lista.shift(); reservaTags[codigo] = lista; LS.set("reservaTipos", reservaTags);
+    garantirReserva(3, codigo).catch(() => {});
+    return fmtTag(n, codigo);
+  }
+  function evento(texto, extra) {
+    return Object.assign({ data: new Date().toISOString(), texto, por: usuario ? usuario.nome : "" }, extra || {});
+  }
+  function comEvento(pn, ev) { return ((pn && pn.eventos) || []).concat([ev]).slice(-60); }
+  function filaPneu(tag, data) { fila.push({ col: "pneus", id: tag, data, merge: true }); }
+
   /* ---------- navegação ---------- */
-  const telas = ["inicio", "matricula", "registro", "salvo", "senha", "controle"];
+  const telas = ["inicio", "matricula", "registro", "salvo", "senha", "controle", "pneus", "tag"];
   function ir(nome) {
     if (nome === "inicio" && window.__appAtualizado) { location.reload(); return; }
     telas.forEach((t) => ($("#t-" + t).hidden = t !== nome));
@@ -118,7 +194,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
       while (fila.length) {
         const item = fila[0];
         try {
-          await db.collection("registros").doc(item.id).set(item.data);
+          await db.collection(item.col || "registros").doc(item.id).set(item.data, item.merge ? { merge: true } : undefined);
         } catch (e) {
           if (e && (e.code === "invalid_argument" || e.code === "permission-denied")) { console.warn("Registro recusado", e); fila.shift(); LS.set("fila", fila); continue; }
           break;
@@ -143,6 +219,12 @@ function conectarFirebase(aoConectar, aoFalhar) {
     db.doc("config/acesso").onSnapshot((s) => {
       if (s.exists && s.data().senhaHash) { senhaHash = s.data().senhaHash; LS.set("senhaHash", senhaHash); }
     }, () => {});
+    db.collection("pneus").onSnapshot((snap) => {
+      const m = {}; snap.docs.forEach((d) => (m[d.id] = d.data()));
+      pneusMap = m; LS.set("pneus", m);
+      renderCtrl();
+    }, () => {});
+    Object.keys(reservaTags).forEach((cod) => { if (reservaTags[cod].length < 3) garantirReserva(3, cod).catch(() => {}); });
     enviarFila();
   }
   conectarFirebase((banco) => {
@@ -151,7 +233,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
   }, () => { dbPronto = true; atualizarStatus(); });
 
   /* ---------- início ---------- */
-  $("#b-iniciar").addEventListener("click", () => { $("#i-matricula").value = ""; verMatricula(); ir("matricula"); });
+  $("#b-iniciar").addEventListener("click", () => { proximaTela = "registro"; $("#i-matricula").value = ""; verMatricula(); ir("matricula"); });
+  $("#b-pneus").addEventListener("click", () => { proximaTela = "pneus"; $("#i-matricula").value = ""; verMatricula(); ir("matricula"); });
   $("#b-controlador").addEventListener("click", () => { $("#i-senha").value = ""; $("#msg-senha").textContent = ""; ir("senha"); setTimeout(() => $("#i-senha").focus(), 50); });
 
   /* ---------- matrícula ---------- */
@@ -181,6 +264,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
   $("#b-confirmar-mat").addEventListener("click", () => {
     const b = acharBorracheiro($("#i-matricula").value); if (!b) return;
     usuario = { matricula: String(b.matricula), nome: b.nome };
+    if (proximaTela === "pneus") { abrirPneus(); return; }
     novoFormulario(); ir("registro");
   });
 
@@ -188,7 +272,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
   let F = {};
   let pneus = [];
   let historicoTag = [];
-  const novoPneu = (ant) => ({ eixo: null, lado: null, posicao: null, saiuSerie: "", saiuTag: "", saiuCondicao: null, saiuRecapagens: null, destino: null,
+  const novoPneu = (ant) => ({ eixo: null, lado: null, posicao: null, saiuSerie: "", saiuTag: "", saiuTagNova: null, saiuTagAplicada: null, saiuCondicao: null, saiuRecapagens: null, destino: null,
+    entrouTagNova: null, entrouTagAplicada: null,
     entrouSerie: "", entrouTag: "", medida: ant ? ant.medida : "", condicao: null, recapagens: null,
     motivo: null, defeito: null, outro: "" });
 
@@ -227,7 +312,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     eixo: Array.from({ length: 16 }, (_, k) => [String(k + 1), String(k + 1)]),
     lado: [["Direito", "Direito"], ["Esquerdo", "Esquerdo"]],
     posicao: [["Interno", "Interno"], ["Externo", "Externo"]],
-    destino: [["Conserto", "Conserto"], ["Recapagem", "Recapagem"], ["Estoque", "Estoque"], ["Sucata", "Sucata"]],
+    destino: [["Conserto", "Conserto"], ["Recapagem", "Recapagem"], ["Pátio", "Pátio"], ["Sucata", "Sucata"]],
     condicao: [["Novo", "Novo"], ["Recapado", "Recapado"]],
     saiuCondicao: [["Novo", "Novo"], ["Recapado", "Recapado"]],
     recapagens: [["0", "0 · Novo"], ["1", "1ª"], ["2", "2ª"], ["3", "3ª"], ["4", "4ª"], ["5", "5ª"], ["6", "6ª"], ["7", "7ª"], ["8", "8ª"], ["9", "9ª"], ["10", "10ª"]],
@@ -253,6 +338,51 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const u = mesmo[0];
     return u && u.entrou && u.entrou.serie ? u : null;
   }
+  function gerarBox(p, lado) {
+    const sel = p[lado + "TipoSel"] || "";
+    return '<div class="gerar-box"><select class="campo" data-pinput="' + lado + 'TipoSel" aria-label="Tipo do pneu para a TAG nova"><option value="">Pneu sem marcação? Escolha o tipo…</option>' +
+      TIPOS.map((t) => '<option value="' + t.codigo + '"' + (sel === t.codigo ? " selected" : "") + ">" + esc(t.codigo + " · " + t.medida) + "</option>").join("") +
+      '</select><button class="btn-gerar" data-acao="gerar" data-lado="' + lado + '">Gerar marcação nova</button></div>';
+  }
+  function htmlTagStatus(p, lado) {
+    const dig = String(p[lado + "Tag"] || "").replace(/\D/g, "");
+    const tag = normTag(dig);
+    const gerar = gerarBox(p, lado);
+    if (!tag) return (dig ? '<p class="tag-dica">Digite os 6 números: nº do pneu + código do tipo (ex.: 001 275).</p>' : "") + gerar;
+    if (p[lado + "TagNova"] === tag) return '<div class="tag-nova"><span>Marcação nova · ' + esc(nomeTipo(tag.slice(4))) + "</span><b>" + esc(tag) + "</b><small>Marque no pneu: símbolo da Albras + estes números</small></div>";
+    if (!tipoDe(tag)) {
+      const inv = TIPOS_MAP[tag.slice(0, 3)];
+      return '<div class="tag-erro">' + (inv ? "Parece que a ordem está invertida: primeiro o nº do pneu, depois o código do tipo (ex.: " + esc(tag.slice(4) + " " + tag.slice(0, 3)) + ")."
+        : "O código de tipo " + esc(tag.slice(4)) + " não existe na legenda. Confira a marcação.") + "</div>" + gerar;
+    }
+    const pn = pneuPorTag(tag);
+    if (!pn) return '<div class="tag-erro">O pneu ' + esc(tag) + " (" + esc(tipoDe(tag).medida) + ") não está cadastrado. Confira a marcação ou gere uma nova.</div>" + gerar;
+    let aviso = "";
+    if (lado === "entrou" && pn.status === "montado") aviso = "O sistema mostra este pneu já montado (" + textoStatus(pn) + "). Confira a TAG.";
+    if (lado === "entrou" && pn.status === "recapagem") aviso = "Voltou da recapagem: marcado como " + (Math.min(10, (Number(pn.recapagens) || 0) + 1)) + "ª recapagem. Confira e corrija nos botões de recapagem se precisar.";
+    if (lado === "entrou" && pn.status === "sucata") aviso = "O sistema mostra este pneu como sucata. Confira a TAG.";
+    if (lado === "saiu" && pn.status !== "montado") aviso = "O sistema mostra este pneu como “" + (NOME_STATUS[pn.status] || "?") + "”, não montado. Confira a TAG.";
+    if (lado === "saiu" && pn.status === "montado" && pn.local && F.equipamento && pn.local.equipTag !== F.equipamento.tag) aviso = "O sistema mostra este pneu em outro equipamento (" + pn.local.equipTag + "). Confira a TAG.";
+    return '<div class="tag-ok"><b>' + esc(tag) + "</b> · série " + esc(pn.serie || "—") + (pn.medida ? " · " + esc(pn.medida) : "") + (textoRecap(pn.recapagens) ? " · " + esc(textoRecap(pn.recapagens)) : "") +
+      "<small>" + esc(textoStatus(pn)) + "</small></div>" + (aviso ? '<div class="tag-aviso">' + esc(aviso) + "</div>" : "");
+  }
+  function aplicarPneu(p, lado, tag) {
+    const pn = pneuPorTag(tag); if (!pn) return false;
+    if (p[lado + "TagAplicada"] === tag) return false;
+    p[lado + "TagAplicada"] = tag;
+    const rec = pn.recapagens === undefined || pn.recapagens === null ? null : String(pn.recapagens);
+    if (lado === "saiu") {
+      if (pn.serie) p.saiuSerie = pn.serie;
+      if (rec !== null) { p.saiuRecapagens = rec; p.saiuCondicao = rec === "0" ? "Sem recapagem" : "Recapado"; }
+    } else {
+      if (pn.serie) p.entrouSerie = pn.serie;
+      if (pn.medida) p.medida = pn.medida;
+      let r2 = rec;
+      if (pn.status === "recapagem") r2 = String(Math.min(10, (Number(pn.recapagens) || 0) + 1));
+      if (r2 !== null) { p.recapagens = r2; p.condicao = r2 === "0" ? "Novo" : "Recapado"; }
+    }
+    return true;
+  }
   function htmlPneu(p, i) {
     const u = sugestaoPara(p);
     const sug = u && norm(p.saiuSerie) !== norm(u.entrou.serie)
@@ -268,14 +398,16 @@ function conectarFirebase(aoConectar, aoFalhar) {
       sug +
       '<div class="par" style="margin-top:18px">' +
         '<section class="saiu"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Pneu que saiu</h4>' +
+          '<span class="rotulo">Marcação do pneu <span class="opc">(nº + tipo)</span></span>' + entrada("saiuTag", p.saiuTag, "TAG do pneu que saiu", ' placeholder="ex.: 001 275" inputmode="numeric"') +
+          '<div class="tag-status" data-tagstatus="saiu">' + htmlTagStatus(p, "saiu") + "</div>" +
           '<span class="rotulo">Nº de série</span>' + entrada("saiuSerie", p.saiuSerie, "Nº de série do pneu que saiu") +
-          '<span class="rotulo">TAG do pneu <span class="opc">(opcional)</span></span>' + entrada("saiuTag", p.saiuTag, "TAG do pneu que saiu") +
           '<span class="rotulo">Recapagens <span class="opc">(0 = nunca foi recapado)</span></span>' + grupo("saiuRecapagens", p.saiuRecapagens) +
           '<span class="rotulo">Destino</span>' + grupo("destino", p.destino) +
         "</section>" +
         '<section class="entrou"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Pneu que entrou</h4>' +
+          '<span class="rotulo">Marcação do pneu <span class="opc">(nº + tipo)</span></span>' + entrada("entrouTag", p.entrouTag, "TAG do pneu que entrou", ' placeholder="ex.: 001 275" inputmode="numeric"') +
+          '<div class="tag-status" data-tagstatus="entrou">' + htmlTagStatus(p, "entrou") + "</div>" +
           '<span class="rotulo">Nº de série</span>' + entrada("entrouSerie", p.entrouSerie, "Nº de série do pneu que entrou") +
-          '<span class="rotulo">TAG do pneu <span class="opc">(opcional)</span></span>' + entrada("entrouTag", p.entrouTag, "TAG do pneu que entrou") +
           '<span class="rotulo">Tipo de pneu (medida)</span>' + entrada("medida", p.medida, "Tipo de pneu (medida)", ' list="medidas" placeholder="ex.: 295/80 R22.5"') +
           '<span class="rotulo">Recapagens <span class="opc">(0 = pneu novo)</span></span>' + grupo("recapagens", p.recapagens) +
         "</section>" +
@@ -295,9 +427,24 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const card = e.target.closest(".pneu"); if (!card) return;
     const i = +card.dataset.idx, p = pneus[i];
     if (e.target.closest('[data-acao="remover"]')) { pneus.splice(i, 1); renderPneus(); return; }
+    const ger = e.target.closest('[data-acao="gerar"]');
+    if (ger) {
+      const lado = ger.dataset.lado, cod = p[lado + "TipoSel"];
+      const box = card.querySelector('[data-tagstatus="' + lado + '"]');
+      if (!cod) { if (box) box.innerHTML = '<div class="tag-erro">Escolha o tipo do pneu antes de gerar a marcação.</div>' + htmlTagStatus(p, lado); return; }
+      ger.disabled = true; ger.textContent = "Gerando…";
+      gerarTag(cod).then((t) => {
+        p[lado + "Tag"] = t; p[lado + "TagNova"] = t; p[lado + "TagAplicada"] = t;
+        if (lado === "entrou") p.medida = TIPOS_MAP[cod].medida;
+        renderPneu(i);
+      }).catch((er) => {
+        if (box) box.innerHTML = '<div class="tag-erro">' + (er && er.message === "esgotado" ? "Os 1.000 números do tipo " + cod + " já foram usados." : "Sem internet para gerar a marcação agora. Conecte o tablet e toque de novo.") + "</div>" + htmlTagStatus(p, lado);
+      });
+      return;
+    }
     const usar = e.target.closest('[data-acao="usar-sug"]');
     if (usar) {
-      p.saiuSerie = usar.dataset.serie; if (usar.dataset.tag) p.saiuTag = usar.dataset.tag;
+      p.saiuSerie = usar.dataset.serie; if (usar.dataset.tag) { p.saiuTag = usar.dataset.tag; aplicarPneu(p, "saiu", normTag(usar.dataset.tag)); }
       if (usar.dataset.cond === "Novo") { p.saiuCondicao = "Sem recapagem"; p.saiuRecapagens = "0"; }
       else if (usar.dataset.cond === "Recapado" && usar.dataset.recap) { p.saiuCondicao = "Recapado"; p.saiuRecapagens = usar.dataset.recap; }
       renderPneu(i); return;
@@ -313,8 +460,20 @@ function conectarFirebase(aoConectar, aoFalhar) {
   });
   $("#lista-pneus").addEventListener("input", (e) => {
     const inp = e.target.closest("[data-pinput]"); if (!inp) return;
-    const card = inp.closest(".pneu"); pneus[+card.dataset.idx][inp.dataset.pinput] = inp.value;
+    const card = inp.closest(".pneu"), i = +card.dataset.idx, p = pneus[i], campo = inp.dataset.pinput;
+    p[campo] = inp.value;
     card.classList.remove("falta");
+    if (campo === "saiuTag" || campo === "entrouTag") {
+      const lado = campo === "saiuTag" ? "saiu" : "entrou";
+      const tag = normTag(inp.value);
+      if (aplicarPneu(p, lado, tag)) {
+        renderPneu(i);
+        const novo = $("#pneu-" + i + ' [data-pinput="' + campo + '"]');
+        if (novo) { novo.focus(); const n = novo.value.length; try { novo.setSelectionRange(n, n); } catch (er) {} }
+      } else {
+        const box = card.querySelector('[data-tagstatus="' + lado + '"]'); if (box) box.innerHTML = htmlTagStatus(p, lado);
+      }
+    }
   });
   $("#b-add-pneu").addEventListener("click", () => {
     pneus.push(novoPneu(pneus[pneus.length - 1]));
@@ -395,11 +554,20 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const leitura = $("#i-leitura").value.trim();
     if (leitura && !F.unidade) add("#c-chamado", "Marque se a leitura é KM ou horas");
     if (leitura && isNaN(numLeitura(leitura))) add("#c-chamado", "A leitura deve ser só número");
-    const posUsadas = {}, seriesEntrou = {};
+    const posUsadas = {}, seriesEntrou = {}, tagsUsadas = {};
     pneus.forEach((p, k) => {
       const alvo = "#pneu-" + k, n = pneus.length > 1 ? "Pneu " + (k + 1) + ": " : "";
       if (!p.eixo) add(alvo, n + "escolha o eixo");
       if (!p.lado) add(alvo, n + "escolha o lado (direito ou esquerdo)");
+      const ts = normTag(p.saiuTag), te = normTag(p.entrouTag);
+      if (!ts) add(alvo, n + "marcação do pneu que saiu: 6 números (se não tiver, gere uma nova)");
+      else if (!tipoDe(ts)) add(alvo, n + "o código de tipo da marcação " + ts + " (pneu que saiu) não existe");
+      else if (!pneuPorTag(ts) && p.saiuTagNova !== ts) add(alvo, n + "o pneu " + ts + " (que saiu) não está cadastrado");
+      if (!te) add(alvo, n + "marcação do pneu que entrou: 6 números (se não tiver, gere uma nova)");
+      else if (!tipoDe(te)) add(alvo, n + "o código de tipo da marcação " + te + " (pneu que entrou) não existe");
+      else if (!pneuPorTag(te) && p.entrouTagNova !== te) add(alvo, n + "o pneu " + te + " (que entrou) não está cadastrado");
+      if (ts && ts === te) add(alvo, n + "o pneu que saiu e o que entrou estão com a mesma marcação");
+      [ts, te].forEach((t) => { if (!t) return; if (tagsUsadas[t] !== undefined && tagsUsadas[t] !== k) add(alvo, n + "a marcação " + t + " já foi usada no pneu " + (tagsUsadas[t] + 1)); else tagsUsadas[t] = k; });
       if (!p.saiuSerie.trim()) add(alvo, n + "nº de série do pneu que saiu");
       if (p.saiuRecapagens === null || p.saiuRecapagens === undefined) add(alvo, n + "recapagens do pneu que saiu (0 se nunca foi recapado)");
       if (!p.destino) add(alvo, n + "destino do pneu que saiu");
@@ -466,9 +634,9 @@ function conectarFirebase(aoConectar, aoFalhar) {
       return Object.assign({}, comum, {
         pneuNumero: k + 1,
         posicao: { eixo: Number(p.eixo), lado: p.lado, posicao: p.posicao || null },
-        saiu: { serie: p.saiuSerie.trim().toUpperCase(), tagPneu: p.saiuTag.trim().toUpperCase(), destino: p.destino,
+        saiu: { serie: p.saiuSerie.trim().toUpperCase(), tagPneu: normTag(p.saiuTag), tagNova: p.saiuTagNova === normTag(p.saiuTag), destino: p.destino,
           condicao: p.saiuCondicao, recapagens: Number(p.saiuRecapagens) },
-        entrou: { serie: p.entrouSerie.trim().toUpperCase(), tagPneu: p.entrouTag.trim().toUpperCase(), medida, condicao: p.condicao,
+        entrou: { serie: p.entrouSerie.trim().toUpperCase(), tagPneu: normTag(p.entrouTag), tagNova: p.entrouTagNova === normTag(p.entrouTag), medida, condicao: p.condicao,
           recapagens: Number(p.recapagens) },
         motivo: p.motivo,
         defeito: p.defeito || null,
@@ -477,6 +645,26 @@ function conectarFirebase(aoConectar, aoFalhar) {
     });
     LS.set("medidas", med.slice(0, 30));
     regs.forEach((r) => fila.push({ id: chamadoId + "-" + r.pneuNumero, data: r }));
+    /* estoque: o pneu que saiu vai para o destino; o que entrou fica montado */
+    const STATUS_DESTINO = { Conserto: "conserto", Recapagem: "recapagem", "Pátio": "patio", Estoque: "patio", Sucata: "sucata" };
+    regs.forEach((r) => {
+      const pos = "eixo " + r.posicao.eixo + " " + r.posicao.lado.toLowerCase() + (r.posicao.posicao ? " " + r.posicao.posicao.toLowerCase() : "");
+      const velhoS = pneuPorTag(r.saiu.tagPneu);
+      const dS = { tag: r.saiu.tagPneu, serie: r.saiu.serie, recapagens: r.saiu.recapagens, status: STATUS_DESTINO[r.saiu.destino] || "estoque", local: null, atualizadoEm: agora,
+        eventos: comEvento(velhoS, evento("Saiu de " + r.tag + " (" + pos + ") → " + r.saiu.destino + (r.motivo ? " · " + r.motivo : ""), { om: r.om })) };
+      if (!velhoS) { dS.criadoEm = agora; dS.criadoPor = { matricula: usuario.matricula, nome: usuario.nome }; }
+      const tS = tipoDe(r.saiu.tagPneu);
+      if (tS) dS.tipo = tS.codigo;
+      if (!velhoS || !velhoS.medida) dS.medida = tS ? tS.medida : r.entrou.medida;
+      filaPneu(r.saiu.tagPneu, dS);
+      const velhoE = pneuPorTag(r.entrou.tagPneu);
+      const dE = { tag: r.entrou.tagPneu, serie: r.entrou.serie, medida: r.entrou.medida, recapagens: r.entrou.recapagens, status: "montado",
+        local: { equipTag: r.tag, equipDesc: r.equipamento.descricao, eixo: r.posicao.eixo, lado: r.posicao.lado, posicao: r.posicao.posicao }, atualizadoEm: agora,
+        eventos: comEvento(velhoE, evento("Montado em " + r.tag + " (" + pos + ")", { om: r.om })) };
+      if (!velhoE) { dE.criadoEm = agora; dE.criadoPor = { matricula: usuario.matricula, nome: usuario.nome }; }
+      const tE = tipoDe(r.entrou.tagPneu); if (tE) dE.tipo = tE.codigo;
+      filaPneu(r.entrou.tagPneu, dE);
+    });
     LS.set("fila", fila);
     atualizarStatus(); enviarFila(); renderCtrl();
     mostrarSalvo(regs);
@@ -501,6 +689,132 @@ function conectarFirebase(aoConectar, aoFalhar) {
     setTimeout(() => { if (b.dataset.confirma === "1") { b.dataset.confirma = ""; b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg>'; } }, 4000);
   });
 
+  /* ---------- pneus: cadastro e atualização ---------- */
+  let C = {};
+  function grupoSimples(sel, aoMudar) {
+    $(sel).addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-v]"); if (!b) return;
+      $$(sel + " button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      aoMudar(b.dataset.v);
+    });
+  }
+  function marcar(sel, v) { $$(sel + " button").forEach((x) => x.setAttribute("aria-pressed", String(v !== null && v !== undefined && x.dataset.v === String(v)))); }
+  grupoSimples("#c-tipo", (v) => { C.tipo = v; });
+  grupoSimples("#c-recap", (v) => { C.recap = v; C.situacao = Number(v) === 0 ? "estoque" : "patio"; marcar("#c-situacao", C.situacao); });
+  grupoSimples("#c-situacao", (v) => { C.situacao = v; });
+  grupoSimples("#a-situacao", (v) => {
+    C.aSituacao = v;
+    const pn = C.aTag && pneuPorTag(C.aTag);
+    if (pn && pn.status === "recapagem" && (v === "patio" || v === "estoque") && Number(C.aRecap) === Number(pn.recapagens)) {
+      C.aRecap = Math.min(10, (Number(pn.recapagens) || 0) + 1); marcar("#a-recap", C.aRecap);
+      $("#pend-atu").innerHTML = '<div class="tag-aviso">Voltou da recapagem: marcado como ' + C.aRecap + "ª recapagem. Confira.</div>";
+    }
+  });
+  grupoSimples("#a-recap", (v) => { C.aRecap = v; });
+
+  function abrirPneus(modo) {
+    $("#quem-pneus").textContent = "Borracheiro: " + usuario.nome + " · " + usuario.matricula;
+    const med = LS.get("medidas", []);
+    $("#medidas").innerHTML = med.map((m) => '<option value="' + esc(m) + '">').join("");
+    novoCadastro(false);
+    limparAtualizacao();
+    modoPneus(modo || "novo");
+    ir("pneus");
+  }
+  function modoPneus(m) {
+    $$("#abas-pneus button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.modo === m)));
+    $("#cad-novo").hidden = m !== "novo"; $("#cad-atualizar").hidden = m !== "atualizar";
+  }
+  $("#abas-pneus").addEventListener("click", (e) => { const b = e.target.closest("button[data-modo]"); if (b) modoPneus(b.dataset.modo); });
+  function novoCadastro(manterLote) {
+    const lote = manterLote ? { tipo: C.tipo, marca: $("#c-marca").value, recap: C.recap, situacao: C.situacao } : {};
+    C = { tipo: lote.tipo || null, recap: lote.recap ?? null, situacao: lote.situacao || "estoque" };
+    $("#c-serie").value = ""; $("#c-marca").value = lote.marca || "";
+    marcar("#c-tipo", C.tipo); marcar("#c-recap", C.recap); marcar("#c-situacao", C.situacao);
+    $("#pend-cad").innerHTML = ""; $("#c-cad").classList.remove("falta");
+  }
+  $("#b-cadastrar").addEventListener("click", async () => {
+    const faltas = [];
+    const serie = $("#c-serie").value.trim().toUpperCase();
+    const tipo = C.tipo && TIPOS_MAP[C.tipo], medida = tipo ? tipo.medida : "";
+    if (!serie) faltas.push("Nº de série");
+    if (!tipo) faltas.push("Tipo de pneu");
+    if (C.recap === null || C.recap === undefined) faltas.push("Recapagens (0 se for novo)");
+    const dup = serie && pneuPorSerie(serie);
+    if (dup) faltas.push("Esse nº de série já está cadastrado como " + dup.tag + ". Use a aba “Pneu com TAG”.");
+    if (faltas.length) {
+      $("#c-cad").classList.add("falta");
+      $("#pend-cad").innerHTML = '<div class="pendencias">Confira:<ul>' + faltas.map((f) => "<li>" + esc(f) + "</li>").join("") + "</ul></div>";
+      return;
+    }
+    const btn = $("#b-cadastrar"); btn.disabled = true; btn.textContent = "Gerando marcação…";
+    let tag;
+    try { tag = await gerarTag(tipo.codigo); }
+    catch (e) {
+      $("#pend-cad").innerHTML = '<div class="pendencias">' + (e && e.message === "esgotado" ? "Os 1.000 números do tipo " + tipo.codigo + " já foram usados." : "Sem internet para gerar a marcação agora. Conecte o tablet e tente de novo.") + "</div>";
+      btn.disabled = false; btn.textContent = "Cadastrar e gerar TAG"; return;
+    }
+    btn.disabled = false; btn.textContent = "Cadastrar e gerar TAG";
+    const agora = new Date().toISOString();
+    const marca = $("#c-marca").value.trim();
+    const recap = Number(C.recap);
+    filaPneu(tag, { tag, tipo: tipo.codigo, serie, medida, marca, recapagens: recap, status: C.situacao, local: null, criadoEm: agora, atualizadoEm: agora,
+      criadoPor: { matricula: usuario.matricula, nome: usuario.nome },
+      eventos: [evento("Cadastrado · " + (NOME_STATUS[C.situacao] || C.situacao) + " · " + (recap === 0 ? "novo" : recap + "ª recapagem"))] });
+    LS.set("fila", fila);
+    const med = LS.get("medidas", []); if (!med.includes(medida)) { med.unshift(medida); LS.set("medidas", med.slice(0, 30)); }
+    atualizarStatus(); enviarFila();
+    $("#tg-tag").textContent = tag;
+    $("#tg-tipo").textContent = "Pneu nº " + tag.slice(0, 3) + " · tipo " + nomeTipo(tipo.codigo);
+    $("#tg-resumo").textContent = "Série " + serie + (marca ? " · " + marca : "") + " · " + (recap === 0 ? "novo" : recap + "ª recapagem") + " · " + NOME_STATUS[C.situacao] + "." +
+      (navigator.onLine && db ? "" : " Sem conexão agora: o cadastro sobe sozinho quando a internet voltar.");
+    ir("tag");
+  });
+  $("#b-cad-outro").addEventListener("click", () => { novoCadastro(true); modoPneus("novo"); ir("pneus"); setTimeout(() => $("#c-serie").focus(), 50); });
+  $("#b-cad-sair").addEventListener("click", () => { usuario = null; ir("inicio"); });
+  $("#b-sair-pneus").addEventListener("click", () => { usuario = null; ir("inicio"); });
+
+  function limparAtualizacao() {
+    C.aTag = null; C.aSituacao = null; C.aRecap = null;
+    $("#a-tag").value = ""; $("#a-obs").value = ""; $("#a-ficha").innerHTML = "";
+    $("#a-campos").hidden = true; $("#b-atualizar").hidden = true; $("#pend-atu").innerHTML = "";
+  }
+  $("#a-tag").addEventListener("input", () => {
+    const tag = normTag($("#a-tag").value);
+    const pn = pneuPorTag(tag);
+    $("#pend-atu").innerHTML = "";
+    if (!tag) { $("#a-ficha").innerHTML = ""; $("#a-campos").hidden = true; $("#b-atualizar").hidden = true; return; }
+    if (!pn) {
+      $("#a-ficha").innerHTML = '<div class="tag-erro" style="margin-top:10px">' + (!tipoDe(tag) ? (TIPOS_MAP[tag.slice(0, 3)] ? "Parece que a ordem está invertida: primeiro o nº do pneu, depois o código do tipo." : "O código de tipo " + esc(tag.slice(4)) + " não existe na legenda.") : "O pneu " + esc(tag) + " não está cadastrado. Confira a marcação.") + "</div>";
+      $("#a-campos").hidden = true; $("#b-atualizar").hidden = true; C.aTag = null; return;
+    }
+    if (C.aTag !== tag) {
+      C.aTag = tag; C.aSituacao = pn.status === "montado" ? null : pn.status; C.aRecap = pn.recapagens;
+      marcar("#a-situacao", C.aSituacao); marcar("#a-recap", C.aRecap); $("#a-obs").value = "";
+    }
+    $("#a-ficha").innerHTML = '<div class="tag-ok" style="margin-top:10px"><b>' + esc(tag) + "</b> · série " + esc(pn.serie || "—") + (pn.medida ? " · " + esc(pn.medida) : "") + (pn.marca ? " · " + esc(pn.marca) : "") +
+      (textoRecap(pn.recapagens) ? " · " + esc(textoRecap(pn.recapagens)) : "") + "<small>" + esc(textoStatus(pn)) + "</small></div>" +
+      (pn.status === "montado" ? '<div class="tag-aviso">Este pneu está montado. Para tirar do equipamento, registre uma troca. Só altere aqui se o sistema estiver errado.</div>' : "");
+    $("#a-campos").hidden = false; $("#b-atualizar").hidden = false;
+  });
+  $("#b-atualizar").addEventListener("click", () => {
+    const tag = C.aTag, pn = pneuPorTag(tag);
+    if (!pn) return;
+    if (!C.aSituacao) { $("#pend-atu").innerHTML = '<div class="pendencias">Escolha onde o pneu está agora.</div>'; return; }
+    const agora = new Date().toISOString();
+    const recap = C.aRecap === null || C.aRecap === undefined ? pn.recapagens : Number(C.aRecap);
+    const mudou = [];
+    if (C.aSituacao !== pn.status) mudou.push((NOME_STATUS[pn.status] || "?") + " → " + NOME_STATUS[C.aSituacao]);
+    if (recap !== pn.recapagens) mudou.push("recapagens " + (pn.recapagens ?? "?") + " → " + recap);
+    const obs = $("#a-obs").value.trim();
+    if (!mudou.length && !obs) { $("#pend-atu").innerHTML = '<div class="pendencias">Nada foi alterado.</div>'; return; }
+    filaPneu(tag, { status: C.aSituacao, local: C.aSituacao === "montado" ? pn.local : null, recapagens: recap, atualizadoEm: agora,
+      eventos: comEvento(pn, evento("Atualizado" + (mudou.length ? ": " + mudou.join(" · ") : "") + (obs ? " · " + obs : ""))) });
+    LS.set("fila", fila); atualizarStatus(); enviarFila(); renderCtrl();
+    limparAtualizacao();
+    $("#pend-atu").innerHTML = '<div class="msg-ok">Pneu ' + esc(tag) + " atualizado" + (mudou.length ? ": " + esc(mudou.join(" · ")) : "") + ".</div>";
+  });
+
   /* ---------- controlador ---------- */
   $("#f-senha").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -516,7 +830,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
   let tagAberta = null;
   function abrirControle() {
     ir("controle");
-    $("#ctrl-lista").hidden = false; $("#ctrl-detalhe").hidden = true; tagAberta = null;
+    $("#ctrl-lista").hidden = false; $("#ctrl-detalhe").hidden = true; tagAberta = null; pneuAberto = null;
     if (db && !inscritoCtrl) {
       inscritoCtrl = true;
       db.collection("registros").orderBy("dataHora", "desc").limit(1000).onSnapshot((snap) => {
@@ -609,8 +923,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
       return '<div class="chamado-pneu">' +
         (g.length > 1 ? '<span class="np">Pneu ' + (x.pneuNumero || "") + "</span>" : "") +
         '<div class="pos"><span class="chip">Eixo ' + esc(p.eixo) + '</span><span class="chip">' + esc(p.lado) + "</span>" + (p.posicao ? '<span class="chip">' + esc(p.posicao) + "</span>" : "") + '<span class="chip">' + esc(motivo) + "</span></div>" +
-        '<div class="par"><section class="saiu"><h4>Saiu ' + textoSaiu(x.saiu) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.saiu.serie) + "</dd>" + (x.saiu.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.saiu.tagPneu) + "</dd>" : "") + "<dt>Destino</dt><dd>" + esc(x.saiu.destino) + "</dd></dl></section>" +
-        '<section class="entrou"><h4>Entrou ' + textoCondicao(x.entrou) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.entrou.serie) + "</dd>" + (x.entrou.tagPneu ? "<dt>TAG</dt><dd>" + esc(x.entrou.tagPneu) + "</dd>" : "") + "<dt>Medida</dt><dd>" + esc(x.entrou.medida) + "</dd></dl></section></div></div>";
+        '<div class="par"><section class="saiu"><h4>Saiu ' + textoSaiu(x.saiu) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.saiu.serie) + "</dd>" + (x.saiu.tagPneu ? '<dt>TAG</dt><dd><button class="link-pneu" data-pneu="' + esc(x.saiu.tagPneu) + '">' + esc(x.saiu.tagPneu) + "</button></dd>" : "") + "<dt>Destino</dt><dd>" + esc(x.saiu.destino) + "</dd></dl></section>" +
+        '<section class="entrou"><h4>Entrou ' + textoCondicao(x.entrou) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.entrou.serie) + "</dd>" + (x.entrou.tagPneu ? '<dt>TAG</dt><dd><button class="link-pneu" data-pneu="' + esc(x.entrou.tagPneu) + '">' + esc(x.entrou.tagPneu) + "</button></dd>" : "") + "<dt>Medida</dt><dd>" + esc(x.entrou.medida) + "</dd></dl></section></div></div>";
     }).join("");
     return '<article class="registro">' +
       (mostrarEquip ? '<button class="equip-link" data-tag="' + esc(r.tag) + '"><b>' + esc(r.tag) + "</b><span>" + esc([e.descricao, e.area].filter(Boolean).join(" · ")) + "</span></button>" : "") +
@@ -619,13 +933,67 @@ function conectarFirebase(aoConectar, aoFalhar) {
       (det ? '<div class="detalhes">' + det + "</div>" : "") + blocos + "</article>";
   }
 
+  let pneuAberto = null;
+  let filtroStatus = null;
+  function renderEstoque() {
+    const q = norm($("#i-busca-ctrl").value);
+    const todos = todosPneus();
+    const box = $("#lista-estoque");
+    if (!todos.length) {
+      $("#resumo-ctrl").textContent = "";
+      box.innerHTML = '<div class="vazio">Nenhum pneu cadastrado ainda.<br>Os pneus aparecem aqui quando o borracheiro cadastra no tablet (“Cadastrar ou atualizar pneu”) ou gera uma TAG na hora da troca.</div>';
+      return;
+    }
+    const ordem = ["estoque", "patio", "montado", "recapagem", "conserto", "sucata"];
+    const cont = {}; ordem.forEach((s) => (cont[s] = 0)); todos.forEach((p) => (cont[p.status] = (cont[p.status] || 0) + 1));
+    const chips = '<div class="status-chips" id="chips-status"><button data-st="" aria-pressed="' + (!filtroStatus) + '"><b>' + todos.length + "</b><span>Todos</span></button>" +
+      ordem.map((s) => '<button data-st="' + s + '" aria-pressed="' + (filtroStatus === s) + '"><b>' + cont[s] + "</b><span>" + NOME_STATUS[s] + "</span></button>").join("") + "</div>";
+    const prontos = todos.filter((p) => p.status === "estoque" || p.status === "patio");
+    const porMed = {};
+    const codDe = (p) => p.tipo || (tipoDe(p.tag) || {}).codigo || "—";
+    todos.forEach((p) => { const m = codDe(p); porMed[m] = porMed[m] || { n: 0, est: 0, pat: 0, usados: 0 }; porMed[m].usados++; });
+    prontos.forEach((p) => { const m = codDe(p); porMed[m].n++; if (p.status === "estoque") porMed[m].est++; else porMed[m].pat++; });
+    const meds = Object.keys(porMed).sort();
+    const tabela = meds.length ? '<div class="tabela-medidas"><table><thead><tr><th>Tipo</th><th style="text-align:right">Estoque (novos)</th><th style="text-align:right">Pátio (usados)</th><th style="text-align:right">Prontos</th><th style="text-align:right">Nº usados</th><th style="text-align:right">Livres</th></tr></thead><tbody>' +
+      meds.map((m) => "<tr><td><b>" + esc(m) + "</b> " + esc(TIPOS_MAP[m] ? TIPOS_MAP[m].medida : "") + '</td><td class="n">' + porMed[m].est + '</td><td class="n">' + porMed[m].pat + '</td><td class="n">' + porMed[m].n + '</td><td class="n">' + porMed[m].usados + '</td><td class="n">' + Math.max(0, 1000 - porMed[m].usados) + "</td></tr>").join("") + "</tbody></table></div>" : "";
+    const lista = todos.filter((p) => (!filtroStatus || p.status === filtroStatus) &&
+      (!q || [p.tag, p.serie, p.medida, p.marca, p.local && p.local.equipTag].some((v) => norm(v).includes(q))))
+      .sort((a, b) => (String(a.tag).slice(4) + String(a.tag).slice(0, 3)).localeCompare(String(b.tag).slice(4) + String(b.tag).slice(0, 3)));
+    $("#resumo-ctrl").textContent = todos.length + (todos.length === 1 ? " pneu cadastrado" : " pneus cadastrados") + (filtroStatus || q ? " · mostrando " + lista.length : "");
+    box.innerHTML = chips + (filtroStatus && filtroStatus !== "estoque" && filtroStatus !== "patio" ? "" : tabela) +
+      (lista.length ? '<div class="lista-pneus-est">' + lista.map((p) =>
+        '<button data-pneu="' + esc(p.tag) + '"><span class="tg">' + esc(p.tag) + '</span><span class="md"><strong>' + esc(p.medida || "Medida não informada") + (p.marca ? " · " + esc(p.marca) : "") + "</strong><small>Série " + esc(p.serie || "—") + " · " + esc(textoRecap(p.recapagens) || "recapagens não informadas") + "</small></span>" +
+        '<span class="selo st-' + esc(p.status) + '">' + esc(p.status === "montado" && p.local ? "Montado · " + p.local.equipTag : NOME_STATUS[p.status] || "?") + "</span></button>").join("") + "</div>"
+        : '<div class="vazio">Nenhum pneu com esse filtro.</div>');
+  }
+  function fmtDataHora(iso) { const d = new Date(iso); return isNaN(d) ? "" : fmtData(hojeISO(d)) + " " + horaHM(d); }
+  function renderFichaPneu(tag) {
+    const pn = pneuPorTag(tag);
+    if (!pn) { $("#detalhe-conteudo").innerHTML = '<div class="vazio">Pneu ' + esc(tag) + " não encontrado.</div>"; return; }
+    const cab = '<div class="cab-equip"><span class="tag">' + esc(tag) + '</span><span class="desc">' + esc(pn.medida || "Medida não informada") + (pn.marca ? " · " + esc(pn.marca) : "") + '</span><div class="chips">' +
+      '<span class="selo st-' + esc(pn.status) + '" style="font-size:15px;padding:4px 12px">' + esc(textoStatus(pn)) + "</span>" +
+      '<span class="chip">Série ' + esc(pn.serie || "—") + "</span>" + (textoRecap(pn.recapagens) ? '<span class="chip">' + esc(textoRecap(pn.recapagens)) + "</span>" : "") +
+      (pn.criadoEm ? '<span class="chip">Cadastrado em ' + esc(fmtData(hojeISO(new Date(pn.criadoEm)))) + (pn.criadoPor ? " por " + esc(pn.criadoPor.nome) : "") + "</span>" : "") + "</div></div>";
+    const evs = (pn.eventos || []).slice().reverse();
+    const lista = evs.length ? '<div class="ficha-eventos">' + evs.map((ev) => "<div><time>" + esc(fmtDataHora(ev.data)) + "</time><span>" + esc(ev.texto) + "</span>" +
+      ((ev.por || ev.om) ? "<small>" + esc([ev.por, ev.om ? "OM " + ev.om : ""].filter(Boolean).join(" · ")) + "</small>" : "") + "</div>").join("") + "</div>" : '<div class="vazio">Sem movimentações registradas.</div>';
+    $("#detalhe-conteudo").innerHTML = cab + '<h3 class="dia-cab" style="margin-top:22px"><span>Vida do pneu</span><small>' + evs.length + (evs.length === 1 ? " movimentação" : " movimentações") + "</small></h3>" + lista;
+  }
+  function abrirFicha(tag) {
+    pneuAberto = tag; tagAberta = null;
+    $("#ctrl-lista").hidden = true; $("#ctrl-detalhe").hidden = false; renderFichaPneu(tag); window.scrollTo(0, 0);
+  }
+
   function renderCtrl() {
     if ($("#t-controle").hidden) return;
     if (tagAberta) { renderDetalhe(tagAberta); return; }
-    const porData = vistaCtrl === "data";
+    if (pneuAberto) { renderFichaPneu(pneuAberto); return; }
+    const porData = vistaCtrl === "data", porEstoque = vistaCtrl === "estoque";
     $("#filtro-periodo").hidden = !porData;
     $("#lista-datas").hidden = !porData;
-    $("#lista-equip").hidden = porData;
+    $("#lista-equip").hidden = vistaCtrl !== "equip";
+    $("#lista-estoque").hidden = !porEstoque;
+    if (porEstoque) { renderEstoque(); return; }
     const regs = todosRegistros();
     const q = norm($("#i-busca-ctrl").value);
     const box = porData ? $("#lista-datas") : $("#lista-equip");
@@ -659,10 +1027,13 @@ function conectarFirebase(aoConectar, aoFalhar) {
   }
   $("#i-busca-ctrl").addEventListener("input", renderCtrl);
   $("#ctrl-lista").addEventListener("click", (e) => {
+    const st = e.target.closest("#chips-status button"); if (st) { filtroStatus = st.dataset.st || null; renderCtrl(); return; }
+    const pnb = e.target.closest("[data-pneu]"); if (pnb) { abrirFicha(pnb.dataset.pneu); return; }
     const b = e.target.closest("[data-tag]"); if (!b) return;
-    tagAberta = b.dataset.tag; $("#ctrl-lista").hidden = true; $("#ctrl-detalhe").hidden = false; renderDetalhe(tagAberta); window.scrollTo(0, 0);
+    tagAberta = b.dataset.tag; pneuAberto = null; $("#ctrl-lista").hidden = true; $("#ctrl-detalhe").hidden = false; renderDetalhe(tagAberta); window.scrollTo(0, 0);
   });
-  $("#b-voltar-lista").addEventListener("click", () => { tagAberta = null; $("#ctrl-lista").hidden = false; $("#ctrl-detalhe").hidden = true; renderCtrl(); });
+  $("#detalhe-conteudo").addEventListener("click", (e) => { const pnb = e.target.closest("[data-pneu]"); if (pnb) abrirFicha(pnb.dataset.pneu); });
+  $("#b-voltar-lista").addEventListener("click", () => { pneuAberto = null; tagAberta = null; $("#ctrl-lista").hidden = false; $("#ctrl-detalhe").hidden = true; renderCtrl(); });
 
   function textoSaiu(sa) {
     if (!sa || (sa.recapagens === null || sa.recapagens === undefined) && !sa.condicao) return "";
