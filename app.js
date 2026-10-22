@@ -686,6 +686,206 @@ function conectarFirebase(aoConectar, aoFalhar) {
   }
   setPeriodo("30");
 
+  /* ---------- exportar Excel ---------- */
+  function fmtDataHora(iso) { const d = new Date(iso); return isNaN(d) ? "" : fmtData(hojeISO(d)) + " " + horaHM(d); }
+  let carregandoXlsx = null;
+  function carregarXlsx() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    if (!carregandoXlsx) carregandoXlsx = new Promise((ok, falha) => {
+      const s = document.createElement("script"); s.src = "xlsx.mini.min.js";
+      s.onload = () => (window.XLSX ? ok(window.XLSX) : falha(new Error("xlsx")));
+      s.onerror = () => { carregandoXlsx = null; falha(new Error("xlsx")); };
+      document.head.appendChild(s);
+    });
+    return carregandoXlsx;
+  }
+  const dataExcel = (iso) => { if (!iso) return ""; const [y, m, d] = String(iso).split("-").map(Number); return y ? new Date(y, m - 1, d, 12, 0, 0) : ""; };
+  const horasMin = (min) => (typeof min === "number" ? Math.floor(min / 60) + ":" + String(min % 60).padStart(2, "0") : "");
+  const txtMotivo = (r) => r.motivo === "Pneu com defeito" ? "Pneu com defeito" : (r.motivo || "");
+  const txtDefeito = (r) => r.motivo === "Pneu com defeito" ? (r.defeito === "Outro" ? "Outro: " + (r.motivoTexto || "") : (r.defeito || "")) : "";
+  const txtPos = (p) => p ? ["Eixo " + p.eixo, p.lado, p.posicao].filter(Boolean).join(" ") : "";
+  function folha(XLSX, linhas, larguras) {
+    const ws = XLSX.utils.json_to_sheet(linhas, { cellDates: true });
+    if (linhas.length) {
+      const cab = Object.keys(linhas[0]);
+      ws["!cols"] = cab.map((c, i) => ({ wch: (larguras && larguras[i]) || Math.min(40, Math.max(10, c.length + 2)) }));
+      ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: linhas.length, c: cab.length - 1 } }) };
+      const rng = XLSX.utils.decode_range(ws["!ref"]);
+      for (let R = 1; R <= rng.e.r; R++) for (let C = 0; C <= rng.e.c; C++) {
+        const cel = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+        if (cel && cel.v instanceof Date) { cel.t = "d"; cel.z = "dd/mm/yyyy"; }
+      }
+    }
+    return ws;
+  }
+  $("#b-excel").addEventListener("click", async () => {
+    const btn = $("#b-excel"), msg = $("#msg-excel");
+    msg.innerHTML = "";
+    const [de, ate] = intervalo();
+    const q = norm($("#i-busca-ctrl").value);
+    const regs = todosRegistros().filter((r) => (!de || String(r.dataServico) >= de) && (!ate || String(r.dataServico) <= ate) && bateBusca(r, q))
+      .sort((a, b) => String(a.dataHora).localeCompare(String(b.dataHora)) || (a.pneuNumero || 0) - (b.pneuNumero || 0));
+    if (!regs.length) { msg.innerHTML = '<div class="pendencias">Nenhuma troca nesse período' + (q ? " com essa busca" : "") + ". Escolha outro período ou toque em “Tudo”.</div>"; return; }
+    btn.disabled = true;
+    let XLSX;
+    try { XLSX = await carregarXlsx(); }
+    catch (e) { btn.disabled = false; msg.innerHTML = '<div class="pendencias">Não foi possível carregar o gerador de Excel. Abra o app com internet uma vez e tente de novo.</div>'; return; }
+    try {
+      const chamados = agruparChamados(regs).sort((a, b) => String(a[0].dataHora).localeCompare(String(b[0].dataHora)));
+      const idCham = new Map(); chamados.forEach((g, k) => idCham.set(g[0].chamadoId || g[0]._id, k + 1));
+      const eqInfo = (r) => equip.find((x) => x.tag === r.tag) || r.equipamento || {};
+
+      /* aba 1: uma linha por pneu trocado */
+      const trocas = regs.map((r) => {
+        const e = eqInfo(r), p = r.posicao || {}, sa = r.saiu || {}, en = r.entrou || {};
+        return {
+          "Data": dataExcel(r.dataServico),
+          "Hora entrada": r.horaServico || "",
+          "Data saída": dataExcel(r.fim && r.fim.data),
+          "Hora saída": (r.fim && r.fim.hora) || "",
+          "Duração (h:mm)": horasMin(r.duracaoMin),
+          "Duração (min)": typeof r.duracaoMin === "number" ? r.duracaoMin : "",
+          "Nº chamado": idCham.get(r.chamadoId || r._id) || "",
+          "OM / nota": r.om || "",
+          "TAG equipamento": r.tag || "",
+          "Descrição do equipamento": e.descricao || "",
+          "Família": e.familia || "",
+          "Área": e.area || "",
+          "Local de instalação (SAP)": e.local || "",
+          "KM / Horímetro": r.leitura ? (r.leitura.unidade === "H" ? "Horímetro" : "KM") : "",
+          "Leitura": r.leitura ? Number(r.leitura.valor) : "",
+          "Borracheiro": (r.borracheiro && r.borracheiro.nome) || "",
+          "Matrícula": (r.borracheiro && r.borracheiro.matricula) || "",
+          "Pneu do chamado": r.pneuNumero || 1,
+          "Pneus no chamado": r.totalPneus || 1,
+          "Eixo": p.eixo ?? "",
+          "Lado": p.lado || "",
+          "Posição": p.posicao || "",
+          "Saiu - nº de série": sa.serie || "",
+          "Saiu - TAG do pneu": sa.tagPneu || "",
+          "Saiu - recapagens": sa.recapagens ?? "",
+          "Saiu - destino": sa.destino || "",
+          "Entrou - nº de série": en.serie || "",
+          "Entrou - TAG do pneu": en.tagPneu || "",
+          "Entrou - medida": en.medida || "",
+          "Entrou - condição": en.condicao || "",
+          "Entrou - recapagens": en.recapagens ?? "",
+          "Motivo": txtMotivo(r),
+          "Defeito": txtDefeito(r),
+          "Motivo (outro)": r.motivo === "Outro" ? (r.motivoTexto || "") : "",
+          "Observações": r.observacoes || "",
+          "Registrado no tablet em": r.criadoEm ? fmtDataHora(r.criadoEm) : "",
+          "Enviado ao banco": r._pendente ? "Aguardando envio" : "Sim"
+        };
+      });
+
+      /* aba 2: um chamado por linha */
+      const linhasCham = chamados.map((g, k) => {
+        const r = g[0], e = eqInfo(r);
+        const motivos = {}; g.forEach((x) => { const m = txtMotivo(x) + (txtDefeito(x) ? " (" + txtDefeito(x) + ")" : ""); motivos[m] = (motivos[m] || 0) + 1; });
+        return {
+          "Nº chamado": k + 1,
+          "Data": dataExcel(r.dataServico),
+          "Hora entrada": r.horaServico || "",
+          "Hora saída": (r.fim && r.fim.hora) || "",
+          "Duração (h:mm)": horasMin(r.duracaoMin),
+          "Duração (min)": typeof r.duracaoMin === "number" ? r.duracaoMin : "",
+          "OM / nota": r.om || "",
+          "TAG equipamento": r.tag || "",
+          "Descrição do equipamento": e.descricao || "",
+          "Família": e.familia || "",
+          "Área": e.area || "",
+          "Borracheiro": (r.borracheiro && r.borracheiro.nome) || "",
+          "Matrícula": (r.borracheiro && r.borracheiro.matricula) || "",
+          "Pneus trocados": g.length,
+          "Posições": g.map((x) => txtPos(x.posicao)).join(" | "),
+          "Motivos": Object.entries(motivos).map(([m, n]) => (n > 1 ? n + "x " : "") + m).join(" | "),
+          "Pneus novos montados": g.filter((x) => x.entrou && Number(x.entrou.recapagens) === 0).length,
+          "Pneus recapados montados": g.filter((x) => x.entrou && Number(x.entrou.recapagens) > 0).length,
+          "KM / Horímetro": r.leitura ? (r.leitura.unidade === "H" ? "Horímetro" : "KM") : "",
+          "Leitura": r.leitura ? Number(r.leitura.valor) : "",
+          "Observações": r.observacoes || ""
+        };
+      });
+
+      /* aba 3: por equipamento */
+      const porEq = new Map();
+      regs.forEach((r) => {
+        if (!porEq.has(r.tag)) porEq.set(r.tag, { rs: [], ch: new Set() });
+        const o = porEq.get(r.tag); o.rs.push(r); o.ch.add(r.chamadoId || r._id);
+      });
+      const linhasEq = Array.from(porEq.entries()).map(([tag, o]) => {
+        const e = equip.find((x) => x.tag === tag) || o.rs[0].equipamento || {};
+        const datas = o.rs.map((x) => x.dataServico).sort();
+        const durCham = {}; o.rs.forEach((x) => { durCham[x.chamadoId || x._id] = x.duracaoMin || 0; });
+        const minTot = Object.values(durCham).reduce((s, v) => s + v, 0);
+        return {
+          "TAG equipamento": tag, "Descrição": e.descricao || "", "Família": e.familia || "", "Área": e.area || "",
+          "Chamados": o.ch.size, "Pneus trocados": o.rs.length,
+          "Furado": o.rs.filter((x) => x.motivo === "Pneu furado").length,
+          "Careca": o.rs.filter((x) => x.motivo === "Pneu careca").length,
+          "Com defeito": o.rs.filter((x) => x.motivo === "Pneu com defeito").length,
+          "Estourado": o.rs.filter((x) => x.motivo === "Pneu estourado").length,
+          "Outro": o.rs.filter((x) => x.motivo === "Outro").length,
+          "Tempo total (h:mm)": horasMin(minTot),
+          "Primeira troca": dataExcel(datas[0]), "Última troca": dataExcel(datas[datas.length - 1])
+        };
+      }).sort((a, b) => b["Pneus trocados"] - a["Pneus trocados"]);
+
+      /* aba 4: por motivo/defeito */
+      const porMot = {};
+      regs.forEach((r) => { const k = txtMotivo(r) + "|" + (txtDefeito(r) || (r.motivo === "Outro" ? r.motivoTexto || "" : "")); porMot[k] = (porMot[k] || 0) + 1; });
+      const linhasMot = Object.entries(porMot).map(([k, n]) => { const [m, d] = k.split("|"); return { "Motivo": m, "Detalhe": d, "Pneus": n, "% do total": Math.round((n / regs.length) * 1000) / 10 }; })
+        .sort((a, b) => b["Pneus"] - a["Pneus"]);
+
+      /* aba 5: por borracheiro */
+      const porB = new Map();
+      regs.forEach((r) => {
+        const k = (r.borracheiro && r.borracheiro.matricula) || "?";
+        if (!porB.has(k)) porB.set(k, { nome: (r.borracheiro && r.borracheiro.nome) || "", ch: {}, n: 0 });
+        const o = porB.get(k); o.n++; o.ch[r.chamadoId || r._id] = r.duracaoMin || 0;
+      });
+      const linhasB = Array.from(porB.entries()).map(([mat, o]) => {
+        const nCh = Object.keys(o.ch).length, min = Object.values(o.ch).reduce((s, v) => s + v, 0);
+        return { "Borracheiro": o.nome, "Matrícula": mat, "Chamados": nCh, "Pneus trocados": o.n, "Tempo total (h:mm)": horasMin(min), "Tempo médio por chamado (min)": nCh ? Math.round(min / nCh) : 0 };
+      }).sort((a, b) => b["Pneus trocados"] - a["Pneus trocados"]);
+
+      /* aba 6: por destino do pneu que saiu e por condição do que entrou */
+      const contar = (f) => { const o = {}; regs.forEach((r) => { const k = f(r); if (k !== "") o[k] = (o[k] || 0) + 1; }); return o; };
+      const dest = contar((r) => (r.saiu && r.saiu.destino) || "Não informado");
+      const recE = contar((r) => (r.entrou && r.entrou.recapagens !== undefined && r.entrou.recapagens !== null ? (Number(r.entrou.recapagens) === 0 ? "Novo (0)" : r.entrou.recapagens + "ª recapagem") : "Não informado"));
+      const linhasPneus = [
+        ...Object.entries(dest).map(([k, n]) => ({ "Grupo": "Destino do pneu que saiu", "Item": k, "Pneus": n })),
+        ...Object.entries(recE).sort().map(([k, n]) => ({ "Grupo": "Pneu que entrou", "Item": k, "Pneus": n }))
+      ];
+
+      const info = [
+        { "Campo": "Relatório", "Valor": "Controle de Borracharia — trocas de pneu" },
+        { "Campo": "Período", "Valor": (de ? fmtData(de) : "início") + " a " + (ate ? fmtData(ate) : "hoje") },
+        { "Campo": "Filtro de busca", "Valor": $("#i-busca-ctrl").value.trim() || "nenhum" },
+        { "Campo": "Chamados", "Valor": chamados.length },
+        { "Campo": "Pneus trocados", "Valor": regs.length },
+        { "Campo": "Equipamentos atendidos", "Valor": porEq.size },
+        { "Campo": "Gerado em", "Valor": fmtDataHora(new Date().toISOString()) }
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, folha(XLSX, trocas, [11, 9, 11, 9, 9, 8, 9, 12, 14, 34, 20, 18, 14, 11, 10, 20, 10, 8, 8, 6, 10, 9, 16, 14, 10, 12, 16, 14, 16, 12, 10, 18, 20, 18, 30, 18, 14]), "Trocas (por pneu)");
+      XLSX.utils.book_append_sheet(wb, folha(XLSX, linhasCham, [9, 11, 9, 9, 9, 8, 12, 14, 34, 20, 18, 20, 10, 9, 40, 40, 10, 10, 11, 10, 30]), "Chamados");
+      XLSX.utils.book_append_sheet(wb, folha(XLSX, linhasEq, [14, 34, 20, 18, 9, 9, 7, 7, 10, 9, 7, 12, 12, 12]), "Por equipamento");
+      XLSX.utils.book_append_sheet(wb, folha(XLSX, linhasMot, [20, 26, 8, 10]), "Por motivo");
+      XLSX.utils.book_append_sheet(wb, folha(XLSX, linhasB, [22, 10, 9, 10, 12, 14]), "Por borracheiro");
+      XLSX.utils.book_append_sheet(wb, folha(XLSX, linhasPneus, [26, 22, 8]), "Pneus (destino e condição)");
+      XLSX.utils.book_append_sheet(wb, folha(XLSX, info, [22, 44]), "Info");
+      const nome = "Borracharia_" + (de || "inicio") + "_a_" + (ate || hojeISO()) + ".xlsx";
+      XLSX.writeFile(wb, nome, { compression: true });
+      msg.innerHTML = '<div class="msg-ok">Planilha gerada: ' + esc(nome) + " · " + chamados.length + (chamados.length === 1 ? " chamado" : " chamados") + ", " + regs.length + (regs.length === 1 ? " pneu" : " pneus") + ". Confira na pasta de downloads.</div>";
+    } catch (e) {
+      console.error(e);
+      msg.innerHTML = '<div class="pendencias">Não foi possível gerar a planilha. Tente de novo.</div>';
+    } finally { btn.disabled = false; }
+  });
+
   $("#b-sair-ctrl").addEventListener("click", () => { tagAberta = null; ir("inicio"); });
 
   /* trocar senha */

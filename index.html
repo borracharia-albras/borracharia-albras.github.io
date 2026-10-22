@@ -47,6 +47,13 @@
 .opcoes.eixos{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}
 .opcoes.eixos button{min-width:0;padding:8px 0}
 @media (max-width:640px){.opcoes.eixos{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* exportação Excel */
+.btn-excel{min-height:60px;padding:0 22px;border:0;border-radius:var(--r);background:var(--ok);color:#fff;font-weight:700;font-size:17px;letter-spacing:.04em;text-transform:uppercase;display:inline-flex;align-items:center;gap:10px}
+.btn-excel svg{width:24px;height:24px}
+.btn-excel:disabled{opacity:.6}
+#msg-excel .msg-ok,#msg-excel .pendencias{margin-top:12px}
+.msg-ok{padding:14px 18px;border-radius:var(--r);background:var(--ok-bg);color:var(--ok);font-weight:700}
 </style>
 </head>
 <body>
@@ -399,7 +406,12 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg>
           <input class="campo" id="i-busca-ctrl" placeholder="Buscar TAG, OM, série do pneu ou borracheiro" autocomplete="off" aria-label="Buscar">
         </div>
+        <button class="btn-excel" id="b-excel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 19h16"/></svg>
+          Exportar Excel
+        </button>
       </div>
+      <div id="msg-excel"></div>
       <div class="filtro-periodo" id="filtro-periodo">
         <div class="opcoes" id="periodos">
           <button data-p="hoje">Hoje</button><button data-p="7">7 dias</button><button data-p="30" aria-pressed="true">30 dias</button><button data-p="tudo">Tudo</button>
@@ -443,7 +455,7 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
   </form>
 </div>
 
-<script type="module" src="app.js?v=16"></script>
+<script type="module" src="app.js?v=17"></script>
 <script>
 if ("serviceWorker" in navigator) {
   const tinhaVersao = !!navigator.serviceWorker.controller;

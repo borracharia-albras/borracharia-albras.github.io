@@ -1,8 +1,8 @@
 /* Service worker: guarda o app no tablet para abrir sem internet
    e busca sempre a versão mais nova quando há internet. */
-const VERSAO = "borracharia-v16";
+const VERSAO = "borracharia-v17";
 const ARQUIVOS = ["./", "index.html", "app.js", "firebase.js", "manifest.webmanifest",
-  "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png", "icons/favicon.png"];
+  "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png", "icons/favicon.png", "xlsx.mini.min.js"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSAO)
