@@ -120,6 +120,20 @@
 .btn-excel svg{width:24px;height:24px}
 .btn-excel:disabled{opacity:.6}
 #msg-excel .msg-ok,#msg-excel .pendencias{margin-top:12px}
+
+/* v19 */
+.par-um>section{border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:18px;min-width:0}
+.par-um h4{margin:0 0 4px;font-family:var(--f-titulo);font-size:20px;letter-spacing:.04em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.par-um h4 svg{width:22px;height:22px}
+.conserto-sec h4{color:var(--brand)!important}
+.pneu-cab .servico-tag{font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 10px;border-radius:999px;background:var(--amarelo);color:var(--amarelo-ink)}
+.opcoes[data-pcampo="servico"] button{text-transform:none;letter-spacing:0;font-size:17px}
+#om-junta .tag-ok,#om-junta .tag-aviso{margin-top:10px;display:grid;gap:8px}
+#om-junta .btn-sec{min-height:48px;justify-self:start;padding:6px 18px;font-size:15px}
+.pendencias.avisos{background:var(--surface);border:2px solid var(--amarelo);color:var(--ink)}
+.pendencias.avisos .btn-sec{margin-top:12px}
+#i-leitura:disabled{opacity:.45}
+select.campo{font-size:17px}
 </style>
 </head>
 <body>
@@ -381,18 +395,19 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
 
     <div class="cartao" id="c-chamado">
       <h3>2. Dados do chamado</h3>
-      <label class="rotulo" for="i-om">Nº OM / nota</label>
-      <input class="campo" id="i-om" inputmode="numeric" autocomplete="off">
-      <span class="rotulo">KM / horímetro <span class="opc">(opcional: só se o equipamento tiver)</span></span>
+      <label class="rotulo" for="i-om">Nº OM / nota <span class="opc">(9 números)</span></label>
+      <input class="campo" id="i-om" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="ex.: 110563177">
+      <div id="om-junta"></div>
+      <span class="rotulo">KM / horímetro <span class="opc">(digite a leitura do painel ou marque “Sem horímetro”)</span></span>
       <div class="grade-2">
-        <div class="opcoes" data-campo="unidade" data-opcional><button data-v="KM">KM</button><button data-v="H">Horas</button></div>
+        <div class="opcoes" data-campo="unidade"><button data-v="KM">KM</button><button data-v="H">Horas</button><button data-v="SEM">Sem horímetro</button></div>
         <input class="campo" id="i-leitura" inputmode="decimal" placeholder="Leitura no painel" aria-label="Leitura do KM ou horímetro">
       </div>
     </div>
 
     <div class="cartao" id="c-pneus">
-      <h3>3. Pneus trocados <span class="contador" id="contador-pneus"></span></h3>
-      <p class="dica" style="margin:-8px 0 0">Trocou mais de um pneu neste chamado? Preencha o primeiro e toque em “Adicionar outro pneu”. TAG, OM e horário valem para todos.</p>
+      <h3>3. Pneus <span class="contador" id="contador-pneus"></span></h3>
+      <p class="dica" style="margin:-8px 0 0">Para cada pneu, escolha se foi <b>troca</b> ou <b>conserto no local</b> (o mesmo pneu volta). Mais de um pneu na mesma OM? Toque em “Adicionar outro pneu”: TAG, OM e horário valem para todos.</p>
       <div id="lista-pneus"></div>
       <button class="btn-adicionar" id="b-add-pneu">+ Adicionar outro pneu</button>
       <datalist id="medidas"></datalist>
@@ -400,14 +415,10 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
 
     <div class="cartao" id="c-hora">
       <h3>4. Horário do serviço</h3>
-      <span class="rotulo">Hora de entrada (início)</span>
+      <span class="rotulo">Hora de entrada (início) <span class="opc">(digite a hora real em que o serviço começou)</span></span>
       <div class="grade-2">
         <input class="campo" type="date" id="i-data-ini" aria-label="Data de entrada">
         <input class="campo" type="time" id="i-hora-ini" aria-label="Hora de entrada">
-      </div>
-      <div class="grade-2" style="margin-top:10px">
-        <button class="btn-amarelo" data-agora="ini">Agora</button>
-        <button class="btn-amarelo" data-menos1="ini">−1 hora</button>
       </div>
       <hr style="border:0;border-top:1px solid var(--line);margin:22px 0 0">
       <span class="rotulo" style="margin-top:18px">Hora de saída (fim)</span>
@@ -448,12 +459,15 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
         <h3>Cadastrar pneu e gerar TAG</h3>
         <label class="rotulo" for="c-serie">Nº de série</label>
         <input class="campo" id="c-serie" autocomplete="off">
+        <label class="rotulo" for="c-dot">DOT <span class="opc">(opcional: semana e ano, 4 números, ex.: 5025)</span></label>
+        <input class="campo" id="c-dot" inputmode="numeric" maxlength="4" autocomplete="off">
         <span class="rotulo">Tipo de pneu <span class="opc">(código da legenda)</span></span>
         <div class="opcoes tipos" id="c-tipo"><button data-v="295"><b>295</b><span>295.80 - 22,5 Borrachudo</span></button><button data-v="296"><b>296</b><span>295.80 - 22,5 Direcional</span></button><button data-v="275"><b>275</b><span>275.80 - 22,5</span></button><button data-v="122"><b>122</b><span>1100.R - 22</span></button><button data-v="120"><b>120</b><span>1100R.20</span></button><button data-v="716"><b>716</b><span>7.50 - 16</span></button><button data-v="715"><b>715</b><span>7.50 - 15</span></button><button data-v="830"><b>830</b><span>18.4 - 30</span></button><button data-v="834"><b>834</b><span>18.4 - 34</span></button><button data-v="235"><b>235</b><span>235/75 - 17,5</span></button><button data-v="205"><b>205</b><span>20.5 - 25</span></button><button data-v="124"><b>124</b><span>12.4 - 24</span></button><button data-v="508"><b>508</b><span>5.00-8 Pneumático</span></button><button data-v="580"><b>580</b><span>5.00-8 Maciço</span></button><button data-v="186"><b>186</b><span>18.6.12 1/8 Maciço</span></button><button data-v="289"><b>289</b><span>28.9-15 Maciço</span></button><button data-v="650"><b>650</b><span>6.50-10 Maciço</span></button><button data-v="250"><b>250</b><span>250-15 Maciço</span></button><button data-v="300"><b>300</b><span>300-15 Maciço</span></button><button data-v="355"><b>355</b><span>355/50-20 Maciço</span></button><button data-v="351"><b>351</b><span>355.50-15 Maciço</span></button><button data-v="365"><b>365</b><span>355/65-15 Maciço</span></button><button data-v="700"><b>700</b><span>7.00-12 Maciço</span></button><button data-v="825"><b>825</b><span>8.25-15 Maciço</span></button><button data-v="228"><b>228</b><span>22.8-16 Maciço</span></button></div>
         <label class="rotulo" for="c-marca">Marca <span class="opc">(opcional)</span></label>
         <input class="campo" id="c-marca" autocomplete="off">
-        <span class="rotulo">Recapagens <span class="opc">(0 = pneu novo)</span></span>
-        <div class="opcoes num" id="c-recap"><button data-v="0">0 · Novo</button><button data-v="1">1ª</button><button data-v="2">2ª</button><button data-v="3">3ª</button><button data-v="4">4ª</button><button data-v="5">5ª</button><button data-v="6">6ª</button><button data-v="7">7ª</button><button data-v="8">8ª</button><button data-v="9">9ª</button><button data-v="10">10ª</button></div>
+        <div id="c-recap-bloco"><span class="rotulo">Recapagens <span class="opc">(0 = pneu novo)</span></span>
+        <div class="opcoes num" id="c-recap"><button data-v="0">0 · Novo</button><button data-v="1">1ª</button><button data-v="2">2ª</button><button data-v="3">3ª</button><button data-v="4">4ª</button><button data-v="5">5ª</button><button data-v="6">6ª</button><button data-v="7">7ª</button><button data-v="8">8ª</button><button data-v="9">9ª</button><button data-v="10">10ª</button></div></div>
+        <p class="tag-dica" id="c-macico" hidden>Pneu maciço: não tem recapagem.</p>
         <span class="rotulo">Onde o pneu está agora</span>
         <div class="opcoes" id="c-situacao"><button data-v="estoque" aria-pressed="true">Estoque (novo)</button><button data-v="patio">Pátio (usado)</button></div>
         <p class="dica">Estoque guarda os pneus novos; Pátio guarda os usados (recapados ou consertados) prontos para montar. Pneu que está montado num equipamento não precisa cadastrar aqui: na hora da troca, use “Gerar TAG nova” no pneu que saiu.</p>
@@ -593,7 +607,7 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
   </form>
 </div>
 
-<script type="module" src="app.js?v=18"></script>
+<script type="module" src="app.js?v=19"></script>
 <script>
 if ("serviceWorker" in navigator) {
   const tinhaVersao = !!navigator.serviceWorker.controller;

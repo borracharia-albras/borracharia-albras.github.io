@@ -12,6 +12,12 @@ const firebaseConfig = {
 /* Legenda de tipos de pneu (marcação = nº do pneu 000–999 + código do tipo) */
 const TIPOS = [{"codigo": "295", "medida": "295.80 - 22,5 Borrachudo"}, {"codigo": "296", "medida": "295.80 - 22,5 Direcional"}, {"codigo": "275", "medida": "275.80 - 22,5"}, {"codigo": "122", "medida": "1100.R - 22"}, {"codigo": "120", "medida": "1100R.20"}, {"codigo": "716", "medida": "7.50 - 16"}, {"codigo": "715", "medida": "7.50 - 15"}, {"codigo": "830", "medida": "18.4 - 30"}, {"codigo": "834", "medida": "18.4 - 34"}, {"codigo": "235", "medida": "235/75 - 17,5"}, {"codigo": "205", "medida": "20.5 - 25"}, {"codigo": "124", "medida": "12.4 - 24"}, {"codigo": "508", "medida": "5.00-8 Pneumático"}, {"codigo": "580", "medida": "5.00-8 Maciço"}, {"codigo": "186", "medida": "18.6.12 1/8 Maciço"}, {"codigo": "289", "medida": "28.9-15 Maciço"}, {"codigo": "650", "medida": "6.50-10 Maciço"}, {"codigo": "250", "medida": "250-15 Maciço"}, {"codigo": "300", "medida": "300-15 Maciço"}, {"codigo": "355", "medida": "355/50-20 Maciço"}, {"codigo": "351", "medida": "355.50-15 Maciço"}, {"codigo": "365", "medida": "355/65-15 Maciço"}, {"codigo": "700", "medida": "7.00-12 Maciço"}, {"codigo": "825", "medida": "8.25-15 Maciço"}, {"codigo": "228", "medida": "22.8-16 Maciço"}];
 const TIPOS_MAP = Object.fromEntries(TIPOS.map((t) => [t.codigo, t]));
+const EH_MACICO = (cod) => !!(cod && TIPOS_MAP[cod] && /maci/i.test(TIPOS_MAP[cod].medida));
+/* nº máximo de eixos por família de equipamento (ajustável) */
+const MAX_EIXOS = { "Carreta prancha": 16, "Veículos especiais": 8, "Carreta silo": 4, "Carreta reboque metal": 4, "Carreta comboio": 4,
+  "Cavalo mecânico": 3, "Caminhão bombeiro": 3, "Caminhão carroceria": 3, "Caminhão sugador": 3, "Caminhão varredeira": 3, "Trator terminal": 3,
+  "Carretinha": 2, "Empilhadeira": 2, "Carro elétrico": 2, "Trator de rodas": 2, "Pá carregadeira": 2, "Varredeira": 2, "Gerador de emergência": 2 };
+const SERIE_SUSPEITA = (s) => { const t = String(s || "").replace(/\s/g, ""); return t.length > 0 && (t.length < 4 || /^(.)\1+$/.test(t) || /^0+1?$/.test(t)); };
 
 /* Listas padrão (usadas até o Firestore responder, e se não houver versão no banco) */
 const EQUIP_PADRAO = [{"local": "80903054", "tag": "CE-91141", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "FAV"}, {"local": "80920615", "tag": "CO-91701", "descricao": "CAMINHAO BOMBEIRO", "familia": "Caminhão bombeiro", "area": "HSS"}, {"local": "80921550", "tag": "CO-91703", "descricao": "CAMINHAO BOMBEIRO", "familia": "Caminhão bombeiro", "area": "HSS"}, {"local": "80925228", "tag": "CE-91128", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Subestação"}, {"local": "80925625", "tag": "GE517001", "descricao": "GERADOR EMERG 2425KW TOSHIBA", "familia": "Gerador de emergência", "area": "Subestação"}, {"local": "80925626", "tag": "GE517002", "descricao": "GERADOR EMERG 2425KW TOSHIBA", "familia": "Gerador de emergência", "area": "Subestação"}, {"local": "80903053", "tag": "CE-91132", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Manutenção FAV"}, {"local": "80902209", "tag": "CE-91127", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "OCH"}, {"local": "80905455", "tag": "CE-91110", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Fundição"}, {"local": "80920519", "tag": "EP-91559", "descricao": "EMPILHADEIRA TOYOTA FSV 4.3(7T)", "familia": "Empilhadeira", "area": "Fundição"}, {"local": "80904458", "tag": "SH-91219", "descricao": "PA CARREGADEIRA 924G", "familia": "Pá carregadeira", "area": "Fundição"}, {"local": "80902205", "tag": "SH-91224", "descricao": "PA CARREGADEIRA 621D", "familia": "Pá carregadeira", "area": "Fundição"}, {"local": "80920550", "tag": "CE-91147", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Offline"}, {"local": "80920551", "tag": "CE-91148", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Offline"}, {"local": "80905441", "tag": "CE-91134", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Cadinho"}, {"local": "80905016", "tag": "CE-93733", "descricao": "CARRETA TRANSPORTE DE CADINHO", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80905017", "tag": "CE-93734", "descricao": "CARRETA TRANSPORTE DE CADINHO", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80905018", "tag": "CE-93735", "descricao": "CARRETA TRANSPORTE DE CADINHO", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80905019", "tag": "CE-93736", "descricao": "CARRETA TRANSPORTE DE CADINHO", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80905020", "tag": "CE-93737", "descricao": "CARRETA TRANSPORTE DE CADINHO", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80905021", "tag": "CE-93738", "descricao": "CARRETA TRANSPORTE DE CADINHO", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80921797", "tag": "CE-93739", "descricao": "CARRETA TRANSPORTE DE CCB", "familia": "Carretinha", "area": "Cadinho"}, {"local": "91048456", "tag": "CE-93740", "descricao": "CARRETA TRANSPORTE DE CCM 4,5", "familia": "Carretinha", "area": "Cadinho"}, {"local": "91048457", "tag": "CE-93741", "descricao": "CARRETA TRANSPORTE DE CCM 4,5", "familia": "Carretinha", "area": "Cadinho"}, {"local": "80913114", "tag": "CE-91146", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Manutenção Redução"}, {"local": "80920620", "tag": "CE-91123", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Manutenção Redução"}, {"local": "80915377", "tag": "EP-91526", "descricao": "EMPILHADEIRA CLARK C55SD 5,5T", "familia": "Empilhadeira", "area": "Cadinho"}, {"local": "80913092", "tag": "CE-91113", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Offline"}, {"local": "80917019", "tag": "CE-91115", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Offline"}, {"local": "80935451", "tag": "CK-92334", "descricao": "CAVALO MECANICO VOLVO 520", "familia": "Cavalo mecânico", "area": "Offline"}, {"local": "91048453", "tag": "CK-92335", "descricao": "CAVALO MEC CONSTELLATION 19.330", "familia": "Cavalo mecânico", "area": "Offline"}, {"local": "80913138", "tag": "EP-91314", "descricao": "EMPILHADEIRA CLARK C45SD", "familia": "Empilhadeira", "area": "Offline"}, {"local": "80913130", "tag": "EP-91531", "descricao": "EMPILHADEIRA HYSTER H120FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80900601", "tag": "CE-91112", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Manutenção Preditiva"}, {"local": "80920648", "tag": "CE-91125", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Manutenção Preditiva"}, {"local": "80913134", "tag": "CE-11601", "descricao": "Carreta comboio lubrificação", "familia": "Carreta comboio", "area": "Manutenção Redução"}, {"local": "80913135", "tag": "CE-11602", "descricao": "Carreta comboio de manutenção", "familia": "Carreta comboio", "area": "Manutenção Redução"}, {"local": "80916359", "tag": "CE-13601", "descricao": "Carreta comboio lubrificação", "familia": "Carreta comboio", "area": "Manutenção Redução"}, {"local": "80916360", "tag": "CE-13602", "descricao": "Carreta comboio de manutenção", "familia": "Carreta comboio", "area": "Manutenção Redução"}, {"local": "80991540", "tag": "CE-13603", "descricao": "Nova Carreta Comboio Manut F1", "familia": "Carreta comboio", "area": "Manutenção Redução"}, {"local": "80913109", "tag": "TT-91483", "descricao": "TRATOR CAIXA MARCHA DE 2 VELO", "familia": "Trator de rodas", "area": "Manutenção Redução"}, {"local": "80916343", "tag": "TT-91481", "descricao": "TRATOR AGRALE", "familia": "Trator de rodas", "area": "Manutenção Redução"}, {"local": "80916348", "tag": "CE-91139", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Manutenção Redução"}, {"local": "80917004", "tag": "CE-91109", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Offline"}, {"local": "80916955", "tag": "CE-93525", "descricao": "REBOQUE PRANCHA SEST", "familia": "Carreta prancha", "area": "Offline"}, {"local": "80916652", "tag": "CE-93527", "descricao": "REBOQUE PRANCHA NICOLAS", "familia": "Carreta prancha", "area": "Offline"}, {"local": "80916810", "tag": "CE-93528", "descricao": "CARRETA TRT - OFFLINE", "familia": "Veículos especiais", "area": "Offline"}, {"local": "80920548", "tag": "CE-93532", "descricao": "Carreta prancha Trudel", "familia": "Carreta prancha", "area": "Offline"}, {"local": "80920549", "tag": "CE-93533", "descricao": "Carreta prancha Trudel", "familia": "Carreta prancha", "area": "Offline"}, {"local": "80917009", "tag": "CK-92124", "descricao": "CAMINHAO CARROC. FORD CARG", "familia": "Caminhão carroceria", "area": "Offline"}, {"local": "91048470", "tag": "EP-91548", "descricao": "EMPILHADEIRA TOYOTA FSV 4.3T", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80904456", "tag": "EP-91517", "descricao": "EMPILHADEIRA HYSTER S155XL2", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80905468", "tag": "EP-91529", "descricao": "EMPILHADEIRA HYSTER H155FT 7T", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80913129", "tag": "EP-91530", "descricao": "EMPILHADEIRA HYSTER H120FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80905474", "tag": "EP-91541", "descricao": "EMPILHADEIRA HYSTER H120FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80904451", "tag": "CE-91133", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "OCH"}, {"local": "80905467", "tag": "EP-91528", "descricao": "EMPILHADEIRA HYSTER H155FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80913131", "tag": "EP-91533", "descricao": "EMPILHADEIRA HYSTER H120FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80916357", "tag": "EP-91536", "descricao": "EMPILHADEIRA HYSTER H120FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "91048454", "tag": "EP-91546", "descricao": "EMPILHADEIRA HYSTER H5.5FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "91048455", "tag": "EP-91547", "descricao": "EMPILHADEIRA HYSTER H5.5FT", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80920520", "tag": "EP-91560", "descricao": "EMPILHADEIRA TOYOTA FSV (7T)", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80905418", "tag": "CE-93301", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80905419", "tag": "CE-93302", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80905420", "tag": "CE-93303", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80905421", "tag": "CE-93304", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80920588", "tag": "CE-93305", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80920589", "tag": "CE-93306", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80905422", "tag": "CE-93307", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "91048590", "tag": "CE-93308", "descricao": "CARRETA REBOQUE METAL TRAILER", "familia": "Carreta reboque metal", "area": "Logística"}, {"local": "80905453", "tag": "CM-31208", "descricao": "TRATOR TERMINAL MAFI MT32", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905454", "tag": "CM-31209", "descricao": "TRATOR TERMINAL MAFI MT32", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905457", "tag": "CM-31210", "descricao": "TRATOR TERMINAL MAFI MT32", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905475", "tag": "CM-31211", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905476", "tag": "CM-31212", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905477", "tag": "CM-31213", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905479", "tag": "CM-31214", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "80905480", "tag": "CM-31215", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "91048465", "tag": "CM-31216", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "91048466", "tag": "CM-31217", "descricao": "TRATOR TERMINAL MAFI T230", "familia": "Trator terminal", "area": "Logística"}, {"local": "80920631", "tag": "EP-91285", "descricao": "EMPILHADEIRA HYSTER H60XM 3T", "familia": "Empilhadeira", "area": "Logística"}, {"local": "80905469", "tag": "EP-91310", "descricao": "EMPILHADEIRA HYSTER H60FT 4T", "familia": "Empilhadeira", "area": "Fundição"}, {"local": "80913132", "tag": "EP-91312", "descricao": "EMPILHADEIRA HYSTER H90FT 4T", "familia": "Empilhadeira", "area": "Fundição"}, {"local": "80935257", "tag": "EP-91509", "descricao": "EMPILHADEIRA HYSTER S155XL2", "familia": "Empilhadeira", "area": "Fundição"}, {"local": "80904460", "tag": "EP-91513", "descricao": "EMPILHADEIRA HYSTER S155XL2", "familia": "Empilhadeira", "area": "Fundição"}, {"local": "80935454", "tag": "EP-91516", "descricao": "EMPILHADEIRA YALE S155XL2 7T", "familia": "Empilhadeira", "area": "Fundição"}, {"local": "80916351", "tag": "TT-91497", "descricao": "TRATOR DE RODAS", "familia": "Trator de rodas", "area": "Cadinho"}, {"local": "80905440", "tag": "VC-91629", "descricao": "VARREDEIRA ELETRICA 120DL", "familia": "Varredeira", "area": "Fundição"}, {"local": "80920640", "tag": "CE-91126", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Infraestrutura"}, {"local": "80920639", "tag": "CE-91124", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Oficina de Veículos"}, {"local": "80913095", "tag": "CE-91130", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Oficina de Veículos"}, {"local": "80920621", "tag": "CK-92117", "descricao": "CAMINHAO CARROCERIA", "familia": "Caminhão carroceria", "area": "Oficina de Veículos"}, {"local": "80903052", "tag": "CE-91117", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Oficinas de Hastes"}, {"local": "80905425", "tag": "CE-93408", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905426", "tag": "CE-93409", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905427", "tag": "CE-93410", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905428", "tag": "CE-93411", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905482", "tag": "CE-93416", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "91048560", "tag": "CE-93417", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905429", "tag": "CE-93412", "descricao": "SILO REBOCÁVEL - BLEND", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905430", "tag": "CE-93413", "descricao": "SILO REBOCÁVEL - BLEND", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905431", "tag": "CE-93414", "descricao": "SILO REBOCÁVEL - ALUMINA", "familia": "Carreta silo", "area": "Logística"}, {"local": "80905481", "tag": "CE-93415", "descricao": "SILO REBOCÁVEL - BLEND", "familia": "Carreta silo", "area": "Logística"}, {"local": "80920590", "tag": "CE-93521", "descricao": "REBOQUE PRANCHA DE ANODO", "familia": "Carreta prancha", "area": "Logística"}, {"local": "80935453", "tag": "CE-93524", "descricao": "REBOQUE PRANCHA DE ANODO", "familia": "Carreta prancha", "area": "Logística"}, {"local": "91048468", "tag": "CE-93529", "descricao": "REBOQUE PRANCHA DE ANODO", "familia": "Carreta prancha", "area": "Logística"}, {"local": "91048469", "tag": "CE-93530", "descricao": "REBOQUE PRANCHA DE ANODO", "familia": "Carreta prancha", "area": "Logística"}, {"local": "80920515", "tag": "VC-91642", "descricao": "VARREDEIRA MECANICA DE SUCÇÃO", "familia": "Varredeira", "area": "Redução 3"}, {"local": "91048600", "tag": "TT-91500", "descricao": "Trator de rodas John Deere", "familia": "Trator de rodas", "area": "Redução 3"}, {"local": "91048602", "tag": "TT-91502", "descricao": "Trator de rodas John Deere", "familia": "Trator de rodas", "area": "Redução 4"}, {"local": "80913159", "tag": "CA-11101", "descricao": "VEÍCULO ALIMENTADOR DE ALUMINA", "familia": "Veículos especiais", "area": "Redução 1"}, {"local": "80916446", "tag": "VC-91643", "descricao": "VARREDEIRA HENCON", "familia": "Varredeira", "area": "Redução 3"}, {"local": "80920516", "tag": "CA-11102", "descricao": "VEÍCULO ALIMENTADOR DE ALUMINA", "familia": "Veículos especiais", "area": "Redução 1"}, {"local": "80905484", "tag": "EP-91316", "descricao": "EMPILHADEIRA HYSTER H60XT 3T", "familia": "Empilhadeira", "area": "OCH"}, {"local": "80915133", "tag": "CE-93721", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 1"}, {"local": "80911934", "tag": "CE-93728", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 2"}, {"local": "80911935", "tag": "CE-93730", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 3"}, {"local": "80913122", "tag": "CE-93732", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 4"}, {"local": "80913127", "tag": "TT-91496", "descricao": "TRATOR DE RODAS", "familia": "Trator de rodas", "area": "Redução 1"}, {"local": "89920700", "tag": "TT-91498", "descricao": "TRATOR DE RODAS", "familia": "Trator de rodas", "area": "Redução 2"}, {"local": "91048601", "tag": "TT-91501", "descricao": "Trator de rodas John Deere", "familia": "Trator de rodas", "area": "Salão Operação Redução 1"}, {"local": "80913096", "tag": "CE-91136", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Redução 2"}, {"local": "80913097", "tag": "CE-91137", "descricao": "CARRO ELETRICO", "familia": "Carro elétrico", "area": "Redução 2"}, {"local": "80911932", "tag": "CE-93722", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 1"}, {"local": "80915134", "tag": "CE-93723", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 2"}, {"local": "80915135", "tag": "CE-93724", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 3"}, {"local": "80913845", "tag": "CE-93725", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 4"}, {"local": "80913120", "tag": "CE-93729", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 1"}, {"local": "80910811", "tag": "TT-91486", "descricao": "TRATOR CAIXA MARCHA DE 2 VELO", "familia": "Trator de rodas", "area": "Redução 2"}, {"local": "80902215", "tag": "VC-91639", "descricao": "VARREDEIRA MECANICA 800D", "familia": "Varredeira", "area": "Redução 3"}, {"local": "80913846", "tag": "CE-93726", "descricao": "CARRETA P/ TRANSPORTE DE DLVA", "familia": "Carretinha", "area": "Redução 3"}, {"local": "80913859", "tag": "CK-92121", "descricao": "CAMINHAO SUGADOR FORD DIESEL", "familia": "Caminhão sugador", "area": "Manutenção Redução"}, {"local": "80905439", "tag": "TT-91406", "descricao": "TRATOR COM TRANSMISSAO SINCRO", "familia": "Trator de rodas", "area": "Manutenção Redução"}, {"local": "80916340", "tag": "TT-91487", "descricao": "TRATOR CAIXA MARCHA DE 2 VELO", "familia": "Trator de rodas", "area": "Redução 4"}, {"local": "80914036", "tag": "TT-91491", "descricao": "TRATOR AGRALE", "familia": "Trator de rodas", "area": "Redução 4"}, {"local": "80905483", "tag": "EP-91315", "descricao": "EMPILHADEIRA HYSTER H60XT 3T", "familia": "Empilhadeira", "area": "FAV"}, {"local": "80903061", "tag": "EP-91543", "descricao": "EMPILHADEIRA HYSTER H120FT 5T", "familia": "Empilhadeira", "area": "FAV"}, {"local": "80905555", "tag": "CE-93531", "descricao": "REBOQUE PRANCHA DE ANODO", "familia": "Carreta prancha", "area": "Logística"}, {"local": "91048474", "tag": "CK-92336", "descricao": "CAVALO MEC MAGNA RIOS", "familia": "Cavalo mecânico", "area": "Logística"}, {"local": "91048475", "tag": "CK-92337", "descricao": "CAVALO MEC MAGNA RIOS", "familia": "Cavalo mecânico", "area": "Logística"}, {"local": "91048476", "tag": "CK-92338", "descricao": "CAVALO MEC MAGNA RIOS", "familia": "Cavalo mecânico", "area": "Logística"}, {"local": "91048471", "tag": "EP-91549", "descricao": "EMPILHADEIRA TOYOTA FSV 4.3T", "familia": "Empilhadeira", "area": "Logística"}, {"local": "91048472", "tag": "EP-91550", "descricao": "EMPILHADEIRA TOYOTA FSV 4.3T", "familia": "Empilhadeira", "area": "Logística"}, {"local": "91048473", "tag": "EP-91551", "descricao": "EMPILHADEIRA TOYOTA FSV 4.3T", "familia": "Empilhadeira", "area": "Logística"}, {"local": "80920517", "tag": "EP-91557", "descricao": "EMPILHADEIRA TOYOTA FSV (7T)", "familia": "Empilhadeira", "area": "Logística"}, {"local": "80920518", "tag": "EP-91558", "descricao": "EMPILHADEIRA TOYOTA FSV (7T)", "familia": "Empilhadeira", "area": "Logística"}, {"local": "80930633", "tag": "CE-91111", "descricao": "Carro Elétrico", "familia": "Carro elétrico", "area": "Utilidades"}, {"local": "91048467", "tag": "CK-92128", "descricao": "CAMINHÃO VARREDEIRA COLPION", "familia": "Caminhão varredeira", "area": "Manutenção OCH"}, {"local": "91079143", "tag": "CK-92129", "descricao": "CAMINHÃO VARREDEIRA COLPION", "familia": "Caminhão varredeira", "area": "Manutenção OCH"}, {"local": "89912188", "tag": "GE7220002", "descricao": "GERADOR DE EMERGENCIA 230KW", "familia": "Gerador de emergência", "area": "Subestação"}];
@@ -284,13 +290,15 @@ function conectarFirebase(aoConectar, aoFalhar) {
   let F = {};
   let pneus = [];
   let historicoTag = [];
-  const novoPneu = (ant) => ({ eixo: null, lado: null, posicao: null, saiuSerie: "", saiuTag: "", saiuTagNova: null, saiuTagAplicada: null, saiuCondicao: null, saiuRecapagens: null, destino: null,
+  const novoPneu = (ant) => ({ servico: "troca", medidaTipo: ant ? ant.medidaTipo : null,
+    eixo: null, lado: null, posicao: null, saiuSerie: "", saiuTag: "", saiuTagNova: null, saiuTagAplicada: null, saiuCondicao: null, saiuRecapagens: null, destino: null,
     entrouTagNova: null, entrouTagAplicada: null,
     entrouSerie: "", entrouTag: "", medida: ant ? ant.medida : "", condicao: null, recapagens: null,
     motivo: null, defeito: null, outro: "" });
 
   function novoFormulario() {
-    F = { equipamento: null, unidade: null };
+    F = { equipamento: null, unidade: null, juntar: null, naoJuntar: false, avisosOk: false };
+    $("#om-junta").innerHTML = ""; $("#i-leitura").disabled = false;
     pneus = [novoPneu()];
     historicoTag = [];
     ["#i-tag", "#i-leitura", "#i-om", "#i-obs"].forEach((s) => ($(s).value = ""));
@@ -300,7 +308,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     $$(".cartao").forEach((c) => c.classList.remove("falta"));
     $("#resultados").innerHTML = "";
     mostrarEquip();
-    const d = new Date(); setDataHora("fim", d); setDataHora("ini", new Date(d.getTime() - 3600000));
+    const d = new Date(); setDataHora("fim", d); $("#i-data-ini").value = hojeISO(d); $("#i-hora-ini").value = ""; atualizarDuracao();
     const med = LS.get("medidas", []);
     $("#medidas").innerHTML = med.map((m) => '<option value="' + esc(m) + '">').join("");
     renderPneus();
@@ -314,10 +322,36 @@ function conectarFirebase(aoConectar, aoFalhar) {
       const ja = b.getAttribute("aria-pressed") === "true";
       if (ja && g.hasAttribute("data-opcional")) { F[campo] = null; b.setAttribute("aria-pressed", "false"); }
       else { g.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); F[campo] = b.dataset.v; }
+      if (campo === "unidade") { const sem = F.unidade === "SEM"; $("#i-leitura").disabled = sem; if (sem) $("#i-leitura").value = ""; else $("#i-leitura").focus(); }
+      F.avisosOk = false;
       const c = g.closest(".cartao"); if (c) c.classList.remove("falta");
     });
   });
-  $("#i-om").addEventListener("input", () => $("#c-chamado").classList.remove("falta"));
+  $("#i-om").addEventListener("input", () => { $("#c-chamado").classList.remove("falta"); F.naoJuntar = false; verificarOM(); });
+  $("#t-registro").addEventListener("input", () => { F.avisosOk = false; });
+
+  /* mesma OM no mesmo equipamento: junta no mesmo chamado */
+  function verificarOM() {
+    const box = $("#om-junta"); F.juntar = null;
+    const om = $("#i-om").value.replace(/\D/g, "");
+    if (!F.equipamento || om.length < 9) { box.innerHTML = ""; return; }
+    const iguais = historicoTag.filter((r) => String(r.om || "").replace(/\D/g, "") === om && r.tag === F.equipamento.tag && r.chamadoId)
+      .sort((a, b) => String(b.dataHora).localeCompare(String(a.dataHora)));
+    if (!iguais.length) { box.innerHTML = ""; return; }
+    const u = iguais[0], doCham = iguais.filter((r) => r.chamadoId === u.chamadoId);
+    const n = Math.max(...doCham.map((r) => Number(r.pneuNumero) || 1));
+    const desc = plural(doCham.length, "pneu", "pneus") + ", " + fmtData(u.dataServico) + " às " + (u.horaServico || "?") + ", " + ((u.borracheiro && u.borracheiro.nome) || "");
+    if (F.naoJuntar) {
+      box.innerHTML = '<div class="tag-aviso">Essa OM já tem um chamado neste equipamento (' + esc(desc) + "). Este registro vai ficar separado.<button class=\"btn-sec\" data-junta=\"sim\">Juntar ao chamado</button></div>";
+      return;
+    }
+    F.juntar = { chamadoId: u.chamadoId, n };
+    box.innerHTML = '<div class="tag-ok">Essa OM já tem um chamado neste equipamento (' + esc(desc) + "). Os pneus deste registro vão entrar no mesmo chamado.<button class=\"btn-sec\" data-junta=\"nao\">Registrar separado</button></div>";
+  }
+  $("#om-junta").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-junta]"); if (!b) return;
+    F.naoJuntar = b.dataset.junta === "nao"; verificarOM();
+  });
 
   /* cartões de pneu */
   const OP = {
@@ -329,12 +363,24 @@ function conectarFirebase(aoConectar, aoFalhar) {
     saiuCondicao: [["Novo", "Novo"], ["Recapado", "Recapado"]],
     recapagens: [["0", "0 · Novo"], ["1", "1ª"], ["2", "2ª"], ["3", "3ª"], ["4", "4ª"], ["5", "5ª"], ["6", "6ª"], ["7", "7ª"], ["8", "8ª"], ["9", "9ª"], ["10", "10ª"]],
     saiuRecapagens: [["0", "0"], ["1", "1ª"], ["2", "2ª"], ["3", "3ª"], ["4", "4ª"], ["5", "5ª"], ["6", "6ª"], ["7", "7ª"], ["8", "8ª"], ["9", "9ª"], ["10", "10ª"]],
-    motivo: [["Pneu furado", "Furado"], ["Pneu careca", "Careca"], ["Pneu com defeito", "Com defeito"], ["Pneu estourado", "Estourado"], ["Outro", "Outro"]],
-    defeito: [["Bolha", "Bolha"], ["Corte", "Corte"], ["Dano no talão", "Dano no talão"], ["Desgaste irregular", "Desgaste irregular"], ["Separação da banda", "Separação da banda"], ["Outro", "Outro"]]
+    motivo: [["Pneu furado", "Furado"], ["Pneu careca", "Careca"], ["Pneu com defeito", "Com defeito"], ["Pneu estourado", "Estourado"], ["Fim de vida", "Fim de vida (limite de recapagem)"], ["Roda/aro danificado", "Roda/aro danificado"], ["Outro", "Outro"]],
+    defeito: [["Bolha", "Bolha"], ["Corte", "Corte"], ["Corte lateral", "Corte lateral"], ["Dano no talão", "Dano no talão"], ["Desgaste irregular", "Desgaste irregular"], ["Separação da banda", "Separação da banda"], ["Outro", "Outro"]],
+    servico: [["troca", "Troca de pneu"], ["conserto", "Conserto no local (mesmo pneu volta)"]],
+    motivoConserto: [["Pneu furado", "Furo"], ["Corte", "Corte"], ["Vazamento / válvula", "Vazamento / válvula"], ["Outro", "Outro"]]
   };
   function grupo(campo, valor, extra) {
     return '<div class="opcoes' + (campo === "eixo" ? " num eixos" : campo === "recapagens" || campo === "saiuRecapagens" ? " num" : "") + '" data-pcampo="' + campo + '"' + (extra || "") + ">" +
-      OP[campo].map(([v, l]) => '<button data-v="' + esc(v) + '" aria-pressed="' + (String(valor) === v) + '">' + esc(l) + "</button>").join("") + "</div>";
+      (campo === "eixo" ? OP.eixo.slice(0, maxEixos()) : OP[campo]).map(([v, l]) => '<button data-v="' + esc(v) + '" aria-pressed="' + (String(valor) === v) + '">' + esc(l) + "</button>").join("") + "</div>";
+  }
+  function maxEixos() { const f = F.equipamento && String(F.equipamento.familia || "").trim(); return (f && MAX_EIXOS[f]) || 6; }
+  const macicoSaiu = (p) => { const t = tipoDe(normTag(p.saiuTag)); return t ? EH_MACICO(t.codigo) : (p.servico !== "conserto" && EH_MACICO(p.medidaTipo)); };
+  const macicoEntrou = (p) => { const t = tipoDe(normTag(p.entrouTag)); return t ? EH_MACICO(t.codigo) : EH_MACICO(p.medidaTipo); };
+  function htmlMedida(p) {
+    const sel = p.medidaTipo || "";
+    return '<select class="campo" data-pinput="medidaSel" aria-label="Tipo de pneu (medida)"><option value="">Escolha o tipo…</option>' +
+      TIPOS.map((t) => '<option value="' + t.codigo + '"' + (sel === t.codigo ? " selected" : "") + ">" + esc(t.codigo + " · " + t.medida) + "</option>").join("") +
+      '<option value="outra"' + (sel === "outra" ? " selected" : "") + ">Outra medida (fora da legenda)</option></select>" +
+      (sel === "outra" ? entrada("medida", p.medida, "Outra medida", ' placeholder="Escreva a medida" style="margin-top:8px"') : "");
   }
   function entrada(campo, valor, rotulo, extra) {
     return '<input class="campo" data-pinput="' + campo + '" value="' + esc(valor) + '" autocomplete="off" aria-label="' + esc(rotulo) + '"' + (extra || "") + ">";
@@ -388,7 +434,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
       if (rec !== null) { p.saiuRecapagens = rec; p.saiuCondicao = rec === "0" ? "Sem recapagem" : "Recapado"; }
     } else {
       if (pn.serie) p.entrouSerie = pn.serie;
-      if (pn.medida) p.medida = pn.medida;
+      const tpE = tipoDe(tag);
+      if (tpE) { p.medidaTipo = tpE.codigo; p.medida = tpE.medida; } else if (pn.medida) { p.medidaTipo = "outra"; p.medida = pn.medida; }
       let r2 = rec;
       if (pn.status === "recapagem") r2 = String(Math.min(10, (Number(pn.recapagens) || 0) + 1));
       if (r2 !== null) { p.recapagens = r2; p.condicao = r2 === "0" ? "Novo" : "Recapado"; }
@@ -396,36 +443,38 @@ function conectarFirebase(aoConectar, aoFalhar) {
     return true;
   }
   function htmlPneu(p, i) {
+    const conserto = p.servico === "conserto";
     const u = sugestaoPara(p);
     const sug = u && norm(p.saiuSerie) !== norm(u.entrou.serie)
-      ? '<div class="sugestao"><span>Último pneu montado nesta posição: <b>série ' + esc(u.entrou.serie) + "</b>" + (u.entrou.tagPneu ? " (TAG " + esc(u.entrou.tagPneu) + ")" : "") + ", em " + esc(fmtData(u.dataServico)) + '.</span><button class="btn-amarelo" style="padding:0 18px" data-acao="usar-sug" data-serie="' + esc(u.entrou.serie) + '" data-tag="' + esc(u.entrou.tagPneu || "") + '" data-cond="' + esc(u.entrou.condicao || "") + '" data-recap="' + esc(u.entrou.recapagens || "") + '">Usar no pneu que saiu</button></div>'
+      ? '<div class="sugestao"><span>Último pneu montado nesta posição: <b>série ' + esc(u.entrou.serie) + "</b>" + (u.entrou.tagPneu ? " (" + esc(u.entrou.tagPneu) + ")" : "") + ", em " + esc(fmtData(u.dataServico)) + '.</span><button class="btn-amarelo" style="padding:0 18px" data-acao="usar-sug" data-serie="' + esc(u.entrou.serie) + '" data-tag="' + esc(u.entrou.tagPneu || "") + '" data-cond="' + esc(u.entrou.condicao || "") + '" data-recap="' + esc(u.entrou.recapagens ?? "") + '">' + (conserto ? "Usar este pneu" : "Usar no pneu que saiu") + "</button></div>"
       : "";
-    const precisaTexto = p.motivo === "Outro" || (p.motivo === "Pneu com defeito" && p.defeito === "Outro");
+    const precisaTexto = p.motivo === "Outro" || (!conserto && p.motivo === "Pneu com defeito" && p.defeito === "Outro");
+    const recSaiu = macicoSaiu(p) ? '<p class="tag-dica">Pneu maciço: não tem recapagem.</p>'
+      : '<span class="rotulo">Recapagens <span class="opc">(0 = nunca foi recapado)</span></span>' + grupo("saiuRecapagens", p.saiuRecapagens);
+    const recEntrou = macicoEntrou(p) ? '<p class="tag-dica">Pneu maciço: não tem recapagem.</p>'
+      : '<span class="rotulo">Recapagens <span class="opc">(0 = pneu novo)</span></span>' + grupo("recapagens", p.recapagens);
+    const blocoSaiu = '<section class="saiu' + (conserto ? " conserto-sec" : "") + '"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6">' +
+        (conserto ? '<path d="M5 12.5l4.5 4.5L19 7.5"/>' : '<path d="M12 5v14M5 12l7 7 7-7"/>') + "</svg>" + (conserto ? "Pneu consertado" : "Pneu que saiu") + "</h4>" +
+        '<span class="rotulo">Marcação do pneu <span class="opc">(nº + tipo)</span></span>' + entrada("saiuTag", p.saiuTag, conserto ? "Marcação do pneu consertado" : "Marcação do pneu que saiu", ' placeholder="ex.: 001 275" inputmode="numeric"') +
+        '<div class="tag-status" data-tagstatus="saiu">' + htmlTagStatus(p, "saiu") + "</div>" +
+        '<span class="rotulo">Nº de série</span>' + entrada("saiuSerie", p.saiuSerie, "Nº de série") + recSaiu +
+        (conserto ? "" : '<span class="rotulo">Destino</span>' + grupo("destino", p.destino)) + "</section>";
+    const blocoEntrou = conserto ? "" : '<section class="entrou"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Pneu que entrou</h4>' +
+        '<span class="rotulo">Marcação do pneu <span class="opc">(nº + tipo)</span></span>' + entrada("entrouTag", p.entrouTag, "Marcação do pneu que entrou", ' placeholder="ex.: 001 275" inputmode="numeric"') +
+        '<div class="tag-status" data-tagstatus="entrou">' + htmlTagStatus(p, "entrou") + "</div>" +
+        '<span class="rotulo">Nº de série</span>' + entrada("entrouSerie", p.entrouSerie, "Nº de série do pneu que entrou") +
+        '<span class="rotulo">Tipo de pneu (medida)</span>' + htmlMedida(p) + recEntrou + "</section>";
     return '<article class="pneu" id="pneu-' + i + '" data-idx="' + i + '">' +
-      '<header class="pneu-cab"><h4>Pneu ' + (i + 1) + '</h4><span class="resumo-pos">' + esc(textoPosicao(p)) + "</span>" +
+      '<header class="pneu-cab"><h4>Pneu ' + (i + 1) + "</h4>" + (conserto ? '<span class="servico-tag">Conserto no local</span>' : "") + '<span class="resumo-pos">' + esc(textoPosicao(p)) + "</span>" +
       (pneus.length > 1 ? '<button class="btn-remover" data-acao="remover">Remover</button>' : "") + "</header>" +
+      '<span class="rotulo">Serviço</span>' + grupo("servico", p.servico) +
       '<span class="rotulo">Eixo</span>' + grupo("eixo", p.eixo) +
       '<span class="rotulo">Lado</span>' + grupo("lado", p.lado) +
       '<span class="rotulo">Posição <span class="opc">(deixe em branco se o eixo tem só um pneu de cada lado)</span></span>' + grupo("posicao", p.posicao, " data-opcional") +
       sug +
-      '<div class="par" style="margin-top:18px">' +
-        '<section class="saiu"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Pneu que saiu</h4>' +
-          '<span class="rotulo">Marcação do pneu <span class="opc">(nº + tipo)</span></span>' + entrada("saiuTag", p.saiuTag, "TAG do pneu que saiu", ' placeholder="ex.: 001 275" inputmode="numeric"') +
-          '<div class="tag-status" data-tagstatus="saiu">' + htmlTagStatus(p, "saiu") + "</div>" +
-          '<span class="rotulo">Nº de série</span>' + entrada("saiuSerie", p.saiuSerie, "Nº de série do pneu que saiu") +
-          '<span class="rotulo">Recapagens <span class="opc">(0 = nunca foi recapado)</span></span>' + grupo("saiuRecapagens", p.saiuRecapagens) +
-          '<span class="rotulo">Destino</span>' + grupo("destino", p.destino) +
-        "</section>" +
-        '<section class="entrou"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Pneu que entrou</h4>' +
-          '<span class="rotulo">Marcação do pneu <span class="opc">(nº + tipo)</span></span>' + entrada("entrouTag", p.entrouTag, "TAG do pneu que entrou", ' placeholder="ex.: 001 275" inputmode="numeric"') +
-          '<div class="tag-status" data-tagstatus="entrou">' + htmlTagStatus(p, "entrou") + "</div>" +
-          '<span class="rotulo">Nº de série</span>' + entrada("entrouSerie", p.entrouSerie, "Nº de série do pneu que entrou") +
-          '<span class="rotulo">Tipo de pneu (medida)</span>' + entrada("medida", p.medida, "Tipo de pneu (medida)", ' list="medidas" placeholder="ex.: 295/80 R22.5"') +
-          '<span class="rotulo">Recapagens <span class="opc">(0 = pneu novo)</span></span>' + grupo("recapagens", p.recapagens) +
-        "</section>" +
-      "</div>" +
-      '<div class="par-motivo"><span class="rotulo">Motivo da troca</span>' + grupo("motivo", p.motivo) +
-        (p.motivo === "Pneu com defeito" ? '<span class="rotulo">Qual defeito?</span>' + grupo("defeito", p.defeito) : "") +
+      (conserto ? '<div class="par-um">' + blocoSaiu + "</div>" : '<div class="par" style="margin-top:18px">' + blocoSaiu + blocoEntrou + "</div>") +
+      '<div class="par-motivo"><span class="rotulo">' + (conserto ? "O que foi consertado" : "Motivo da troca") + "</span>" + grupo(conserto ? "motivoConserto" : "motivo", p.motivo) +
+        (!conserto && p.motivo === "Pneu com defeito" ? '<span class="rotulo">Qual defeito?</span>' + grupo("defeito", p.defeito) : "") +
         (precisaTexto ? '<span class="rotulo">Descreva</span>' + entrada("outro", p.outro, "Descreva o motivo") : "") +
       "</div></article>";
   }
@@ -447,7 +496,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
       ger.disabled = true; ger.textContent = "Gerando…";
       gerarTag(cod).then((t) => {
         p[lado + "Tag"] = t; p[lado + "TagNova"] = t; p[lado + "TagAplicada"] = t;
-        if (lado === "entrou") p.medida = TIPOS_MAP[cod].medida;
+        if (lado === "entrou") { p.medida = TIPOS_MAP[cod].medida; p.medidaTipo = cod; }
         renderPneu(i);
       }).catch((er) => {
         if (box) box.innerHTML = '<div class="tag-erro">' + esc(msgErroTag(er, cod)) + "</div>" + htmlTagStatus(p, lado);
@@ -459,12 +508,18 @@ function conectarFirebase(aoConectar, aoFalhar) {
       p.saiuSerie = usar.dataset.serie; if (usar.dataset.tag) { p.saiuTag = usar.dataset.tag; aplicarPneu(p, "saiu", normTag(usar.dataset.tag)); }
       if (usar.dataset.cond === "Novo") { p.saiuCondicao = "Sem recapagem"; p.saiuRecapagens = "0"; }
       else if (usar.dataset.cond === "Recapado" && usar.dataset.recap) { p.saiuCondicao = "Recapado"; p.saiuRecapagens = usar.dataset.recap; }
+      else if (usar.dataset.cond === "Maciço") { p.saiuCondicao = "Maciço"; p.saiuRecapagens = null; }
       renderPneu(i); return;
     }
     const b = e.target.closest(".opcoes button"); if (!b) return;
-    const g = b.closest("[data-pcampo]"), campo = g.dataset.pcampo;
+    const g = b.closest("[data-pcampo]"), campo0 = g.dataset.pcampo, campo = campo0 === "motivoConserto" ? "motivo" : campo0;
+    F.avisosOk = false;
     p[campo] = (String(p[campo]) === b.dataset.v && g.hasAttribute("data-opcional")) ? null : b.dataset.v;
     if (campo === "motivo" && p.motivo !== "Pneu com defeito") p.defeito = null;
+    if (campo === "servico") {
+      const lista = (p.servico === "conserto" ? OP.motivoConserto : OP.motivo).map((x) => x[0]);
+      if (!lista.includes(p.motivo)) { p.motivo = null; p.defeito = null; }
+    }
     const cond = (v) => (v === null || v === undefined ? null : String(v) === "0" ? "Novo" : "Recapado");
     if (campo === "recapagens") p.condicao = cond(p.recapagens);
     if (campo === "saiuRecapagens") p.saiuCondicao = p.saiuRecapagens === null ? null : String(p.saiuRecapagens) === "0" ? "Sem recapagem" : "Recapado";
@@ -475,6 +530,11 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const card = inp.closest(".pneu"), i = +card.dataset.idx, p = pneus[i], campo = inp.dataset.pinput;
     p[campo] = inp.value;
     card.classList.remove("falta");
+    if (campo === "medidaSel") {
+      p.medidaTipo = inp.value || null;
+      p.medida = inp.value && inp.value !== "outra" ? TIPOS_MAP[inp.value].medida : "";
+      renderPneu(i); return;
+    }
     if (campo === "saiuTag" || campo === "entrouTag") {
       const lado = campo === "saiuTag" ? "saiu" : "entrou";
       const tag = normTag(inp.value);
@@ -509,7 +569,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
   $("#resultados").addEventListener("click", (e) => { const b = e.target.closest("button[data-i]"); if (b) escolherEquip(equip[+b.dataset.i]); });
 
   function escolherEquip(e) {
-    F.equipamento = e; $("#c-equip").classList.remove("falta"); mostrarEquip(); carregarHistoricoTag(e.tag);
+    F.equipamento = e; $("#c-equip").classList.remove("falta"); mostrarEquip(); carregarHistoricoTag(e.tag); verificarOM();
   }
   function mostrarEquip() {
     const e = F.equipamento;
@@ -517,7 +577,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     $("#equip-escolhido").hidden = !e;
     if (!e) return;
     $("#equip-escolhido").innerHTML = '<div class="equip-sel"><span class="tag">' + esc(e.tag) + '</span><div class="desc"><strong>' + esc(e.descricao) + "</strong><small>" + esc(e.familia) + '</small></div><span class="chip">' + esc(e.area) + '</span><button class="icone-btn" id="b-trocar-equip">Trocar</button></div>';
-    $("#b-trocar-equip").addEventListener("click", () => { F.equipamento = null; historicoTag = []; renderPneus(); $("#i-tag").value = ""; mostrarEquip(); buscarEquip(); $("#i-tag").focus(); });
+    $("#b-trocar-equip").addEventListener("click", () => { F.equipamento = null; historicoTag = []; verificarOM(); renderPneus(); $("#i-tag").value = ""; mostrarEquip(); buscarEquip(); $("#i-tag").focus(); });
   }
 
   async function carregarHistoricoTag(tag) {
@@ -530,7 +590,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
         historicoTag = historicoTag.concat(snap.docs.filter((d) => !ids.has(d.id)).map((d) => d.data()));
       } catch (e) {}
     }
-    if (F.equipamento && F.equipamento.tag === tag) renderPneus();
+    if (F.equipamento && F.equipamento.tag === tag) { renderPneus(); verificarOM(); }
   }
 
   /* data e hora */
@@ -559,60 +619,96 @@ function conectarFirebase(aoConectar, aoFalhar) {
   /* validação e salvamento */
   const numLeitura = (t) => Number(t.replace(/\./g, "").replace(",", "."));
   function validar() {
-    const faltas = [];
+    const faltas = [], avisos = [];
     const add = (alvo, txt) => faltas.push({ alvo, txt });
+    const avisa = (alvo, txt) => avisos.push({ alvo, txt });
     if (!F.equipamento) add("#c-equip", "Escolha o equipamento (TAG)");
-    if (!$("#i-om").value.trim()) add("#c-chamado", "Nº da OM / nota");
+    const om = $("#i-om").value.trim();
+    if (!om) add("#c-chamado", "Nº da OM / nota");
+    else if (!/^\d{9}$/.test(om)) add("#c-chamado", "A OM deve ter 9 números, sem espaço nem letra (ex.: 110563177)");
     const leitura = $("#i-leitura").value.trim();
-    if (leitura && !F.unidade) add("#c-chamado", "Marque se a leitura é KM ou horas");
-    if (leitura && isNaN(numLeitura(leitura))) add("#c-chamado", "A leitura deve ser só número");
+    if (!F.unidade) add("#c-chamado", "KM / horímetro: digite a leitura ou marque “Sem horímetro”");
+    else if (F.unidade !== "SEM") {
+      const v = numLeitura(leitura);
+      if (!leitura) add("#c-chamado", "Digite a leitura do " + (F.unidade === "H" ? "horímetro" : "KM") + " (se não tiver, marque “Sem horímetro”)");
+      else if (isNaN(v) || v <= 0) add("#c-chamado", "A leitura deve ser um número maior que zero (se não tiver, marque “Sem horímetro”)");
+      else {
+        const ant = historicoTag.filter((r) => r.leitura && r.leitura.unidade === F.unidade && Number(r.leitura.valor) > 0).sort((a, b) => String(b.dataHora).localeCompare(String(a.dataHora)))[0];
+        if (ant && v < Number(ant.leitura.valor)) avisa("#c-chamado", "A leitura (" + v.toLocaleString("pt-BR") + ") é menor que a última deste equipamento (" + Number(ant.leitura.valor).toLocaleString("pt-BR") + " em " + fmtData(ant.dataServico) + ")");
+      }
+    }
     const posUsadas = {}, seriesEntrou = {}, tagsUsadas = {};
     pneus.forEach((p, k) => {
       const alvo = "#pneu-" + k, n = pneus.length > 1 ? "Pneu " + (k + 1) + ": " : "";
+      const conserto = p.servico === "conserto";
+      const nomeS = conserto ? "pneu consertado" : "pneu que saiu";
       if (!p.eixo) add(alvo, n + "escolha o eixo");
+      else if (Number(p.eixo) > maxEixos()) add(alvo, n + "o eixo " + p.eixo + " não existe neste tipo de equipamento");
       if (!p.lado) add(alvo, n + "escolha o lado (direito ou esquerdo)");
-      const ts = normTag(p.saiuTag), te = normTag(p.entrouTag);
-      if (!ts) add(alvo, n + "marcação do pneu que saiu: 6 números (se não tiver, gere uma nova)");
-      else if (!tipoDe(ts)) add(alvo, n + "o código de tipo da marcação " + ts + " (pneu que saiu) não existe");
-      else if (!pneuPorTag(ts) && p.saiuTagNova !== ts) add(alvo, n + "o pneu " + ts + " (que saiu) não está cadastrado");
-      if (!te) add(alvo, n + "marcação do pneu que entrou: 6 números (se não tiver, gere uma nova)");
-      else if (!tipoDe(te)) add(alvo, n + "o código de tipo da marcação " + te + " (pneu que entrou) não existe");
-      else if (!pneuPorTag(te) && p.entrouTagNova !== te) add(alvo, n + "o pneu " + te + " (que entrou) não está cadastrado");
-      if (ts && ts === te) add(alvo, n + "o pneu que saiu e o que entrou estão com a mesma marcação");
+      const ts = normTag(p.saiuTag), te = conserto ? "" : normTag(p.entrouTag);
+      if (!ts) add(alvo, n + "marcação do " + nomeS + ": 6 números (se não tiver, gere uma nova)");
+      else if (!tipoDe(ts)) add(alvo, n + "o código de tipo da marcação " + ts + " (" + nomeS + ") não existe");
+      else if (!pneuPorTag(ts) && p.saiuTagNova !== ts) add(alvo, n + "o pneu " + ts + " (" + nomeS + ") não está cadastrado");
+      if (!p.saiuSerie.trim()) add(alvo, n + "nº de série do " + nomeS);
+      if (!macicoSaiu(p) && (p.saiuRecapagens === null || p.saiuRecapagens === undefined)) add(alvo, n + "recapagens do " + nomeS + " (0 se nunca foi recapado)");
+      if (!conserto) {
+        if (!te) add(alvo, n + "marcação do pneu que entrou: 6 números (se não tiver, gere uma nova)");
+        else if (!tipoDe(te)) add(alvo, n + "o código de tipo da marcação " + te + " (pneu que entrou) não existe");
+        else if (!pneuPorTag(te) && p.entrouTagNova !== te) add(alvo, n + "o pneu " + te + " (que entrou) não está cadastrado");
+        if (ts && ts === te) add(alvo, n + "o pneu que saiu e o que entrou estão com a mesma marcação");
+        if (!p.destino) add(alvo, n + "destino do pneu que saiu");
+        if (!p.entrouSerie.trim()) add(alvo, n + "nº de série do pneu que entrou");
+        if (!p.medidaTipo || (p.medidaTipo === "outra" && !String(p.medida || "").trim())) add(alvo, n + "tipo (medida) do pneu que entrou");
+        if (!macicoEntrou(p) && (p.recapagens === null || p.recapagens === undefined)) add(alvo, n + "recapagens do pneu que entrou (0 se é novo)");
+        if (p.saiuSerie.trim() && norm(p.saiuSerie) === norm(p.entrouSerie)) add(alvo, n + "o pneu que saiu e o que entrou estão com o mesmo nº de série (se é o mesmo pneu consertado, escolha “Conserto no local”)");
+        const pnE = te && pneuPorTag(te);
+        if (pnE && pnE.status === "montado" && pnE.local) avisa(alvo, n + "o pneu " + te + " aparece montado em " + pnE.local.equipTag + " (eixo " + pnE.local.eixo + " " + String(pnE.local.lado || "").toLowerCase() + ")");
+        if (SERIE_SUSPEITA(p.entrouSerie)) avisa(alvo, n + "a série “" + p.entrouSerie.trim() + "” (pneu que entrou) parece incompleta");
+        const outroE = p.entrouSerie.trim() && pneuPorSerie(p.entrouSerie);
+        if (outroE && outroE.tag !== te) avisa(alvo, n + "a série " + p.entrouSerie.trim().toUpperCase() + " já é do pneu " + outroE.tag + " (" + textoStatus(outroE) + "). Se for o mesmo pneu, use a marcação " + outroE.tag);
+      }
+      if (SERIE_SUSPEITA(p.saiuSerie)) avisa(alvo, n + "a série “" + p.saiuSerie.trim() + "” (" + nomeS + ") parece incompleta");
+      const outroS = p.saiuSerie.trim() && pneuPorSerie(p.saiuSerie);
+      if (outroS && outroS.tag !== ts && p.saiuTagNova === ts) avisa(alvo, n + "a série " + p.saiuSerie.trim().toUpperCase() + " já é do pneu " + outroS.tag + ". Se for o mesmo pneu, use a marcação " + outroS.tag + " em vez da nova");
       [ts, te].forEach((t) => { if (!t) return; if (tagsUsadas[t] !== undefined && tagsUsadas[t] !== k) add(alvo, n + "a marcação " + t + " já foi usada no pneu " + (tagsUsadas[t] + 1)); else tagsUsadas[t] = k; });
-      if (!p.saiuSerie.trim()) add(alvo, n + "nº de série do pneu que saiu");
-      if (p.saiuRecapagens === null || p.saiuRecapagens === undefined) add(alvo, n + "recapagens do pneu que saiu (0 se nunca foi recapado)");
-      if (!p.destino) add(alvo, n + "destino do pneu que saiu");
-      if (!p.entrouSerie.trim()) add(alvo, n + "nº de série do pneu que entrou");
-      if (!p.medida.trim()) add(alvo, n + "tipo (medida) do pneu que entrou");
-      if (p.recapagens === null || p.recapagens === undefined) add(alvo, n + "recapagens do pneu que entrou (0 se é novo)");
-      if (p.saiuSerie.trim() && norm(p.saiuSerie) === norm(p.entrouSerie)) add(alvo, n + "o pneu que saiu e o que entrou estão com o mesmo nº de série");
-      if (!p.motivo) add(alvo, n + "motivo da troca");
-      if (p.motivo === "Pneu com defeito" && !p.defeito) add(alvo, n + "qual defeito");
-      if ((p.motivo === "Outro" || (p.motivo === "Pneu com defeito" && p.defeito === "Outro")) && !p.outro.trim()) add(alvo, n + "descreva o motivo em “Outro”");
+      if (!p.motivo) add(alvo, n + (conserto ? "o que foi consertado" : "motivo da troca"));
+      if (!conserto && p.motivo === "Pneu com defeito" && !p.defeito) add(alvo, n + "qual defeito");
+      if ((p.motivo === "Outro" || (!conserto && p.motivo === "Pneu com defeito" && p.defeito === "Outro")) && !p.outro.trim()) add(alvo, n + "descreva o motivo em “Outro”");
       if (p.eixo && p.lado) {
         const chave = p.eixo + "|" + p.lado + "|" + (p.posicao || "");
         if (posUsadas[chave] !== undefined) add(alvo, n + "mesma posição do pneu " + (posUsadas[chave] + 1));
         else posUsadas[chave] = k;
       }
-      const se = norm(p.entrouSerie);
+      const se = conserto ? "" : norm(p.entrouSerie);
       if (se) { if (seriesEntrou[se] !== undefined) add(alvo, n + "mesmo nº de série que entrou no pneu " + (seriesEntrou[se] + 1)); else seriesEntrou[se] = k; }
     });
     const ini = lerDataHora("ini"), fim = lerDataHora("fim");
-    if (!ini) add("#c-hora", "Informe data e hora de entrada");
+    if (!ini) add("#c-hora", "Digite a hora de entrada (quando o serviço começou)");
     if (!fim) add("#c-hora", "Informe data e hora de saída");
     if (ini && fim && fim < ini) add("#c-hora", "A hora de saída está antes da hora de entrada");
     if (fim && fim.getTime() > Date.now() + 10 * 60000) add("#c-hora", "A hora de saída não pode estar no futuro");
-    return faltas;
+    if (ini && fim && fim >= ini) {
+      const min = Math.round((fim - ini) / 60000);
+      if (min < 5) avisa("#c-hora", "O serviço durou só " + min + " min. Confira as horas de entrada e saída");
+      if (min > 8 * 60) avisa("#c-hora", "O serviço durou " + fmtDur(min) + ". Confira as horas de entrada e saída");
+    }
+    return { faltas, avisos };
   }
 
   $("#b-salvar").addEventListener("click", () => {
     $$(".cartao, .pneu").forEach((c) => c.classList.remove("falta"));
-    const faltas = validar();
+    const { faltas, avisos } = validar();
     if (faltas.length) {
       faltas.forEach((f) => { const el = $(f.alvo); if (el) el.classList.add("falta"); });
       $("#pendencias").innerHTML = '<div class="pendencias">Falta preencher:<ul>' + faltas.map((f) => "<li>" + esc(f.txt) + "</li>").join("") + "</ul></div>";
       const el = $(faltas[0].alvo); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (avisos.length && !F.avisosOk) {
+      $("#pendencias").innerHTML = '<div class="pendencias avisos">Confira antes de salvar:<ul>' + avisos.map((f) => "<li>" + esc(f.txt) + "</li>").join("") +
+        '</ul><button class="btn-sec" id="b-salvar-assim">Está certo, salvar assim</button></div>';
+      $("#b-salvar-assim").addEventListener("click", () => { F.avisosOk = true; $("#b-salvar").click(); });
+      $("#pendencias").scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     $("#pendencias").innerHTML = "";
@@ -620,11 +716,12 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const ini = lerDataHora("ini"), fim = lerDataHora("fim");
     const leituraTxt = $("#i-leitura").value.trim();
     const agora = new Date().toISOString();
-    const chamadoId = novoId();
+    const chamadoId = F.juntar ? F.juntar.chamadoId : novoId();
+    const base = F.juntar ? F.juntar.n : 0;
     const comum = {
       tag: e.tag,
       chamadoId,
-      totalPneus: pneus.length,
+      totalPneus: base + pneus.length,
       dataHora: ini.toISOString(),
       dataServico: $("#i-data-ini").value,
       horaServico: $("#i-hora-ini").value,
@@ -634,24 +731,37 @@ function conectarFirebase(aoConectar, aoFalhar) {
       criadoEm: agora,
       borracheiro: { matricula: usuario.matricula, nome: usuario.nome },
       equipamento: { tag: e.tag, descricao: e.descricao, familia: e.familia, area: e.area, local: e.local || "" },
-      leitura: leituraTxt ? { unidade: F.unidade, valor: numLeitura(leituraTxt) } : null,
+      leitura: F.unidade !== "SEM" && leituraTxt ? { unidade: F.unidade, valor: numLeitura(leituraTxt) } : null,
+      semLeitura: F.unidade === "SEM",
       om: $("#i-om").value.trim(),
       observacoes: $("#i-obs").value.trim()
     };
     const med = LS.get("medidas", []);
     const regs = pneus.map((p, k) => {
-      const medida = p.medida.trim().toUpperCase();
-      if (!med.includes(medida)) med.unshift(medida);
-      const precisaTexto = p.motivo === "Outro" || (p.motivo === "Pneu com defeito" && p.defeito === "Outro");
+      const conserto = p.servico === "conserto";
+      const precisaTexto = p.motivo === "Outro" || (!conserto && p.motivo === "Pneu com defeito" && p.defeito === "Outro");
+      const ts = normTag(p.saiuTag), te = normTag(p.entrouTag);
+      const mS = macicoSaiu(p), mE = macicoEntrou(p);
+      const saiu = { serie: p.saiuSerie.trim().toUpperCase(), tagPneu: ts, tagNova: p.saiuTagNova === ts, destino: conserto ? "Conserto no local" : p.destino,
+        condicao: mS ? "Maciço" : p.saiuCondicao, recapagens: mS ? null : Number(p.saiuRecapagens) };
+      let entrou;
+      if (conserto) {
+        const tp = tipoDe(ts), pn = pneuPorTag(ts);
+        entrou = { serie: saiu.serie, tagPneu: ts, tagNova: false, medida: (tp && tp.medida) || (pn && pn.medida) || "", tipo: tp ? tp.codigo : null,
+          condicao: mS ? "Maciço" : (Number(p.saiuRecapagens) === 0 ? "Novo" : "Recapado"), recapagens: saiu.recapagens, mesmoPneu: true };
+      } else {
+        const medida = p.medidaTipo === "outra" ? String(p.medida || "").trim().toUpperCase() : TIPOS_MAP[p.medidaTipo].medida;
+        if (!med.includes(medida)) med.unshift(medida);
+        entrou = { serie: p.entrouSerie.trim().toUpperCase(), tagPneu: te, tagNova: p.entrouTagNova === te, medida, tipo: p.medidaTipo !== "outra" ? p.medidaTipo : null,
+          condicao: mE ? "Maciço" : p.condicao, recapagens: mE ? null : Number(p.recapagens) };
+      }
       return Object.assign({}, comum, {
-        pneuNumero: k + 1,
+        pneuNumero: base + k + 1,
+        servico: conserto ? "conserto" : "troca",
         posicao: { eixo: Number(p.eixo), lado: p.lado, posicao: p.posicao || null },
-        saiu: { serie: p.saiuSerie.trim().toUpperCase(), tagPneu: normTag(p.saiuTag), tagNova: p.saiuTagNova === normTag(p.saiuTag), destino: p.destino,
-          condicao: p.saiuCondicao, recapagens: Number(p.saiuRecapagens) },
-        entrou: { serie: p.entrouSerie.trim().toUpperCase(), tagPneu: normTag(p.entrouTag), tagNova: p.entrouTagNova === normTag(p.entrouTag), medida, condicao: p.condicao,
-          recapagens: Number(p.recapagens) },
+        saiu, entrou,
         motivo: p.motivo,
-        defeito: p.defeito || null,
+        defeito: conserto ? null : (p.defeito || null),
         motivoTexto: precisaTexto ? p.outro.trim() : ""
       });
     });
@@ -661,18 +771,30 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const STATUS_DESTINO = { Conserto: "conserto", Recapagem: "recapagem", "Pátio": "patio", Estoque: "patio", Sucata: "sucata" };
     regs.forEach((r) => {
       const pos = "eixo " + r.posicao.eixo + " " + r.posicao.lado.toLowerCase() + (r.posicao.posicao ? " " + r.posicao.posicao.toLowerCase() : "");
+      const local = { equipTag: r.tag, equipDesc: r.equipamento.descricao, eixo: r.posicao.eixo, lado: r.posicao.lado, posicao: r.posicao.posicao };
+      const motivoTxt = r.motivo === "Outro" ? "Outro: " + r.motivoTexto : (r.defeito ? r.motivo + ": " + (r.defeito === "Outro" ? r.motivoTexto : r.defeito) : r.motivo);
       const velhoS = pneuPorTag(r.saiu.tagPneu);
-      const dS = { tag: r.saiu.tagPneu, serie: r.saiu.serie, recapagens: r.saiu.recapagens, status: STATUS_DESTINO[r.saiu.destino] || "estoque", local: null, atualizadoEm: agora,
-        eventos: comEvento(velhoS, evento("Saiu de " + r.tag + " (" + pos + ") → " + r.saiu.destino + (r.motivo ? " · " + r.motivo : ""), { om: r.om })) };
-      if (!velhoS) { dS.criadoEm = agora; dS.criadoPor = { matricula: usuario.matricula, nome: usuario.nome }; }
       const tS = tipoDe(r.saiu.tagPneu);
+      if (r.servico === "conserto") {
+        const d = { tag: r.saiu.tagPneu, serie: r.saiu.serie, recapagens: r.saiu.recapagens, status: "montado", local, atualizadoEm: agora,
+          eventos: comEvento(velhoS, evento("Consertado no local em " + r.tag + " (" + pos + ") · " + motivoTxt, { om: r.om, tipo: "conserto" })) };
+        if (!velhoS) { d.criadoEm = agora; d.criadoPor = { matricula: usuario.matricula, nome: usuario.nome }; }
+        if (tS) { d.tipo = tS.codigo; if (!velhoS || !velhoS.medida) d.medida = tS.medida; }
+        filaPneu(r.saiu.tagPneu, d);
+        return;
+      }
+      const dS = { tag: r.saiu.tagPneu, serie: r.saiu.serie, recapagens: r.saiu.recapagens, status: STATUS_DESTINO[r.saiu.destino] || "patio", local: null, atualizadoEm: agora,
+        eventos: comEvento(velhoS, evento("Saiu de " + r.tag + " (" + pos + ") → " + r.saiu.destino + " · " + motivoTxt,
+          { om: r.om, tipo: r.saiu.destino === "Recapagem" ? "enviado_recapagem" : "saida" })) };
+      if (!velhoS) { dS.criadoEm = agora; dS.criadoPor = { matricula: usuario.matricula, nome: usuario.nome }; }
       if (tS) dS.tipo = tS.codigo;
       if (!velhoS || !velhoS.medida) dS.medida = tS ? tS.medida : r.entrou.medida;
       filaPneu(r.saiu.tagPneu, dS);
       const velhoE = pneuPorTag(r.entrou.tagPneu);
-      const dE = { tag: r.entrou.tagPneu, serie: r.entrou.serie, medida: r.entrou.medida, recapagens: r.entrou.recapagens, status: "montado",
-        local: { equipTag: r.tag, equipDesc: r.equipamento.descricao, eixo: r.posicao.eixo, lado: r.posicao.lado, posicao: r.posicao.posicao }, atualizadoEm: agora,
-        eventos: comEvento(velhoE, evento("Montado em " + r.tag + " (" + pos + ")", { om: r.om })) };
+      const voltou = velhoE && velhoE.status === "recapagem";
+      const txtE = (voltou ? "Voltou da recapagem (" + (velhoE.recapagens ?? "?") + " → " + (r.entrou.recapagens ?? "?") + ") e foi montado em " : "Montado em ") + r.tag + " (" + pos + ")";
+      const dE = { tag: r.entrou.tagPneu, serie: r.entrou.serie, medida: r.entrou.medida, recapagens: r.entrou.recapagens, status: "montado", local, atualizadoEm: agora,
+        eventos: comEvento(velhoE, evento(txtE, Object.assign({ om: r.om, tipo: voltou ? "volta_recapagem" : "montagem" }, voltou ? { de: velhoE.recapagens ?? null, para: r.entrou.recapagens } : {}))) };
       if (!velhoE) { dE.criadoEm = agora; dE.criadoPor = { matricula: usuario.matricula, nome: usuario.nome }; }
       const tE = tipoDe(r.entrou.tagPneu); if (tE) dE.tipo = tE.codigo;
       filaPneu(r.entrou.tagPneu, dE);
@@ -684,8 +806,9 @@ function conectarFirebase(aoConectar, aoFalhar) {
 
   function mostrarSalvo(regs) {
     const r0 = regs[0];
-    const linhas = regs.map((r) => "eixo " + r.posicao.eixo + " " + r.posicao.lado.toLowerCase() + (r.posicao.posicao ? " " + r.posicao.posicao.toLowerCase() : "") + " (saiu " + r.saiu.serie + ", entrou " + r.entrou.serie + ")");
-    $("#salvo-texto").textContent = r0.equipamento.tag + " · OM " + r0.om + " · " + (regs.length === 1 ? "1 pneu: " : regs.length + " pneus: ") + linhas.join("; ") + "." +
+    const linhas = regs.map((r) => "eixo " + r.posicao.eixo + " " + r.posicao.lado.toLowerCase() + (r.posicao.posicao ? " " + r.posicao.posicao.toLowerCase() : "") +
+      (r.servico === "conserto" ? " (conserto no local, pneu " + (r.saiu.tagPneu || r.saiu.serie) + ")" : " (saiu " + r.saiu.serie + ", entrou " + r.entrou.serie + ")"));
+    $("#salvo-texto").textContent = r0.equipamento.tag + " · OM " + r0.om + " · " + (F.juntar ? "juntado ao chamado já existente · " : "") + (regs.length === 1 ? "1 pneu: " : regs.length + " pneus: ") + linhas.join("; ") + "." +
       (navigator.onLine && db ? "" : " Sem conexão agora: o registro fica guardado no tablet e é enviado sozinho quando a internet voltar.");
     ir("salvo");
     let s = 30;
@@ -711,7 +834,12 @@ function conectarFirebase(aoConectar, aoFalhar) {
     });
   }
   function marcar(sel, v) { $$(sel + " button").forEach((x) => x.setAttribute("aria-pressed", String(v !== null && v !== undefined && x.dataset.v === String(v)))); }
-  grupoSimples("#c-tipo", (v) => { C.tipo = v; });
+  function aplicarMacicoCad() {
+    const m = EH_MACICO(C.tipo);
+    $("#c-recap-bloco").hidden = m; $("#c-macico").hidden = !m;
+    if (m) { C.recap = 0; marcar("#c-recap", null); }
+  }
+  grupoSimples("#c-tipo", (v) => { C.tipo = v; C.confirmaDup = null; aplicarMacicoCad(); });
   grupoSimples("#c-recap", (v) => { C.recap = v; C.situacao = Number(v) === 0 ? "estoque" : "patio"; marcar("#c-situacao", C.situacao); });
   grupoSimples("#c-situacao", (v) => { C.situacao = v; });
   grupoSimples("#a-situacao", (v) => {
@@ -741,8 +869,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
   function novoCadastro(manterLote) {
     const lote = manterLote ? { tipo: C.tipo, marca: $("#c-marca").value, recap: C.recap, situacao: C.situacao } : {};
     C = { tipo: lote.tipo || null, recap: lote.recap ?? null, situacao: lote.situacao || "estoque" };
-    $("#c-serie").value = ""; $("#c-marca").value = lote.marca || "";
-    marcar("#c-tipo", C.tipo); marcar("#c-recap", C.recap); marcar("#c-situacao", C.situacao);
+    $("#c-serie").value = ""; $("#c-dot").value = ""; $("#c-marca").value = lote.marca || "";
+    marcar("#c-tipo", C.tipo); marcar("#c-recap", C.recap); marcar("#c-situacao", C.situacao); aplicarMacicoCad();
     $("#pend-cad").innerHTML = ""; $("#c-cad").classList.remove("falta");
   }
   $("#b-cadastrar").addEventListener("click", async () => {
@@ -751,12 +879,22 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const tipo = C.tipo && TIPOS_MAP[C.tipo], medida = tipo ? tipo.medida : "";
     if (!serie) faltas.push("Nº de série");
     if (!tipo) faltas.push("Tipo de pneu");
-    if (C.recap === null || C.recap === undefined) faltas.push("Recapagens (0 se for novo)");
-    const dup = serie && pneuPorSerie(serie);
-    if (dup) faltas.push("Esse nº de série já está cadastrado como " + dup.tag + ". Use a aba “Pneu com TAG”.");
+    const macico = EH_MACICO(C.tipo);
+    if (!macico && (C.recap === null || C.recap === undefined)) faltas.push("Recapagens (0 se for novo)");
+    const dot = $("#c-dot").value.trim();
+    if (dot && (!/^\d{4}$/.test(dot) || Number(dot.slice(0, 2)) < 1 || Number(dot.slice(0, 2)) > 53)) faltas.push("DOT: 4 números, semana (01 a 53) + ano (ex.: 5025)");
     if (faltas.length) {
       $("#c-cad").classList.add("falta");
       $("#pend-cad").innerHTML = '<div class="pendencias">Confira:<ul>' + faltas.map((f) => "<li>" + esc(f) + "</li>").join("") + "</ul></div>";
+      return;
+    }
+    const avisosCad = [];
+    const dup = pneuPorSerie(serie);
+    if (dup) avisosCad.push("Já existe o pneu " + dup.tag + " com a série " + serie + (dup.dot ? " (DOT " + dup.dot + ")" : "") + " · " + textoStatus(dup) + ". Se for o mesmo pneu, use a aba “Pneu com TAG”.");
+    if (SERIE_SUSPEITA(serie)) avisosCad.push("A série “" + serie + "” parece incompleta. Confira no pneu.");
+    if (avisosCad.length && C.confirmaDup !== serie) {
+      C.confirmaDup = serie;
+      $("#pend-cad").innerHTML = '<div class="pendencias avisos">Confira antes de cadastrar:<ul>' + avisosCad.map((f) => "<li>" + esc(f) + "</li>").join("") + "</ul>Se estiver certo (é outro pneu), toque em <b>Cadastrar e gerar TAG</b> de novo.</div>";
       return;
     }
     const btn = $("#b-cadastrar"); btn.disabled = true; btn.textContent = "Gerando marcação…";
@@ -769,20 +907,22 @@ function conectarFirebase(aoConectar, aoFalhar) {
     btn.disabled = false; btn.textContent = "Cadastrar e gerar TAG";
     const agora = new Date().toISOString();
     const marca = $("#c-marca").value.trim();
-    const recap = Number(C.recap);
-    filaPneu(tag, { tag, tipo: tipo.codigo, serie, medida, marca, recapagens: recap, status: C.situacao, local: null, criadoEm: agora, atualizadoEm: agora,
+    const recap = macico ? null : Number(C.recap);
+    filaPneu(tag, { tag, tipo: tipo.codigo, serie, dot, medida, marca, recapagens: recap, status: C.situacao, local: null, criadoEm: agora, atualizadoEm: agora,
       criadoPor: { matricula: usuario.matricula, nome: usuario.nome },
-      eventos: [evento("Cadastrado · " + (NOME_STATUS[C.situacao] || C.situacao) + " · " + (recap === 0 ? "novo" : recap + "ª recapagem"))] });
+      eventos: [evento("Cadastrado · " + (NOME_STATUS[C.situacao] || C.situacao) + " · " + (macico ? "maciço" : recap === 0 ? "novo" : recap + "ª recapagem") + (dot ? " · DOT " + dot : ""), { tipo: "cadastro" })] });
+    C.confirmaDup = null;
     LS.set("fila", fila);
     const med = LS.get("medidas", []); if (!med.includes(medida)) { med.unshift(medida); LS.set("medidas", med.slice(0, 30)); }
     atualizarStatus(); enviarFila();
     $("#tg-tag").textContent = tag;
     $("#tg-tipo").textContent = "Pneu nº " + tag.slice(0, 3) + " · tipo " + nomeTipo(tipo.codigo);
-    $("#tg-resumo").textContent = "Série " + serie + (marca ? " · " + marca : "") + " · " + (recap === 0 ? "novo" : recap + "ª recapagem") + " · " + NOME_STATUS[C.situacao] + "." +
+    $("#tg-resumo").textContent = "Série " + serie + (dot ? " · DOT " + dot : "") + (marca ? " · " + marca : "") + " · " + (macico ? "maciço" : recap === 0 ? "novo" : recap + "ª recapagem") + " · " + NOME_STATUS[C.situacao] + "." +
       (navigator.onLine && db ? "" : " Sem conexão agora: o cadastro sobe sozinho quando a internet voltar.");
     ir("tag");
   });
   $("#b-cad-outro").addEventListener("click", () => { novoCadastro(true); modoPneus("novo"); ir("pneus"); setTimeout(() => $("#c-serie").focus(), 50); });
+  $("#c-serie").addEventListener("input", () => { C.confirmaDup = null; });
   $("#b-cad-sair").addEventListener("click", () => { usuario = null; ir("inicio"); });
   $("#b-sair-pneus").addEventListener("click", () => { usuario = null; ir("inicio"); });
 
@@ -821,7 +961,9 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const obs = $("#a-obs").value.trim();
     if (!mudou.length && !obs) { $("#pend-atu").innerHTML = '<div class="pendencias">Nada foi alterado.</div>'; return; }
     filaPneu(tag, { status: C.aSituacao, local: C.aSituacao === "montado" ? pn.local : null, recapagens: recap, atualizadoEm: agora,
-      eventos: comEvento(pn, evento("Atualizado" + (mudou.length ? ": " + mudou.join(" · ") : "") + (obs ? " · " + obs : ""))) });
+      eventos: comEvento(pn, evento("Atualizado" + (mudou.length ? ": " + mudou.join(" · ") : "") + (obs ? " · " + obs : ""),
+        pn.status === "recapagem" && (C.aSituacao === "patio" || C.aSituacao === "estoque") && recap !== pn.recapagens ? { tipo: "volta_recapagem", de: pn.recapagens ?? null, para: recap }
+        : C.aSituacao === "recapagem" && pn.status !== "recapagem" ? { tipo: "enviado_recapagem" } : { tipo: "atualizacao" })) });
     LS.set("fila", fila); atualizarStatus(); enviarFila(); renderCtrl();
     limparAtualizacao();
     $("#pend-atu").innerHTML = '<div class="msg-ok">Pneu ' + esc(tag) + " atualizado" + (mudou.length ? ": " + esc(mudou.join(" · ")) : "") + ".</div>";
@@ -888,9 +1030,11 @@ function conectarFirebase(aoConectar, aoFalhar) {
     return [r.tag, e.descricao, e.area, e.familia, r.om, r.borracheiro && r.borracheiro.nome, r.saiu && r.saiu.serie, r.entrou && r.entrou.serie, r.saiu && r.saiu.tagPneu, r.entrou && r.entrou.tagPneu]
       .some((v) => norm(v).includes(q));
   }
+  /* chamado = mesmo equipamento + mesma OM (junta lançamentos separados da mesma OM) */
+  const chaveCham = (r) => (r.om && r.tag ? r.tag + "|" + String(r.om).trim() : (r.chamadoId || r._id));
   function agruparChamados(rs) {
     const m = new Map();
-    rs.forEach((r) => { const k = r.chamadoId || r._id; if (!m.has(k)) m.set(k, []); m.get(k).push(r); });
+    rs.forEach((r) => { const k = chaveCham(r); if (!m.has(k)) m.set(k, []); m.get(k).push(r); });
     return Array.from(m.values()).sort((a, b) => String(b[0].dataHora).localeCompare(String(a[0].dataHora)));
   }
   function rotuloDia(iso) {
@@ -920,7 +1064,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const pendente = g.some((x) => x._pendente);
     const det = [
       r.om ? "<span><b>OM</b>" + esc(r.om) + "</span>" : "",
-      r.leitura ? "<span><b>" + (r.leitura.unidade === "H" ? "Horímetro" : "KM") + "</b>" + esc(Number(r.leitura.valor).toLocaleString("pt-BR")) + (r.leitura.unidade === "H" ? " h" : " km") + "</span>" : "",
+      r.leitura ? "<span><b>" + (r.leitura.unidade === "H" ? "Horímetro" : "KM") + "</b>" + esc(Number(r.leitura.valor).toLocaleString("pt-BR")) + (r.leitura.unidade === "H" ? " h" : " km") + "</span>" : (r.semLeitura ? "<span><b>Horímetro</b>sem</span>" : ""),
       g.length > 1 ? "<span><b>Pneus</b>" + g.length + "</span>" : "",
       r.observacoes ? "<span><b>Obs.</b>" + esc(r.observacoes) + "</span>" : ""
     ].join("");
@@ -929,9 +1073,19 @@ function conectarFirebase(aoConectar, aoFalhar) {
       quando += " → " + (r.fim.data !== r.dataServico ? esc(fmtData(r.fim.data)) + " " : "") + esc(r.fim.hora);
       if (typeof r.duracaoMin === "number") quando += ' <small style="font-family:var(--f-corpo);font-size:16px;color:var(--muted)">(' + fmtDur(r.duracaoMin) + ")</small>";
     }
+    const lancs = {}; g.forEach((x) => { lancs[(x.chamadoId || x._id) + "|" + x.dataHora] = x; });
+    const lv = Object.values(lancs).sort((a, b) => String(a.dataHora).localeCompare(String(b.dataHora)));
+    if (lv.length > 1) quando = lv.map((x) => esc(x.horaServico || "") + (x.fim && x.fim.hora ? "→" + esc(x.fim.hora) : "")).join(" · ") +
+      ' <small style="font-family:var(--f-corpo);font-size:16px;color:var(--muted)">(' + fmtDur(lv.reduce((s, x) => s + (typeof x.duracaoMin === "number" ? x.duracaoMin : 0), 0)) + ", " + lv.length + " lançamentos)</small>";
     const blocos = g.map((x) => {
       const p = x.posicao || {};
       const motivo = x.motivo === "Pneu com defeito" ? "Pneu com defeito: " + (x.defeito === "Outro" ? x.motivoTexto : x.defeito) : (x.motivo === "Outro" ? "Outro: " + x.motivoTexto : x.motivo);
+      const linkS = x.saiu.tagPneu ? '<dt>TAG</dt><dd><button class="link-pneu" data-pneu="' + esc(x.saiu.tagPneu) + '">' + esc(x.saiu.tagPneu) + "</button></dd>" : "";
+      if (x.servico === "conserto") {
+        return '<div class="chamado-pneu">' + (g.length > 1 ? '<span class="np">Pneu ' + (x.pneuNumero || "") + "</span>" : "") +
+          '<div class="pos"><span class="chip">Eixo ' + esc(p.eixo) + '</span><span class="chip">' + esc(p.lado) + "</span>" + (p.posicao ? '<span class="chip">' + esc(p.posicao) + "</span>" : "") + '<span class="chip">' + esc(motivo) + "</span></div>" +
+          '<div class="par-um"><section class="saiu conserto-sec"><h4>Conserto no local ' + textoSaiu(x.saiu) + '</h4><dl class="kv"><dt>Série</dt><dd>' + esc(x.saiu.serie) + "</dd>" + linkS + "<dt>Resultado</dt><dd>O mesmo pneu voltou para o equipamento</dd></dl></section></div></div>";
+      }
       return '<div class="chamado-pneu">' +
         (g.length > 1 ? '<span class="np">Pneu ' + (x.pneuNumero || "") + "</span>" : "") +
         '<div class="pos"><span class="chip">Eixo ' + esc(p.eixo) + '</span><span class="chip">' + esc(p.lado) + "</span>" + (p.posicao ? '<span class="chip">' + esc(p.posicao) + "</span>" : "") + '<span class="chip">' + esc(motivo) + "</span></div>" +
@@ -984,7 +1138,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     if (!pn) { $("#detalhe-conteudo").innerHTML = '<div class="vazio">Pneu ' + esc(tag) + " não encontrado.</div>"; return; }
     const cab = '<div class="cab-equip"><span class="tag">' + esc(tag) + '</span><span class="desc">' + esc(pn.medida || "Medida não informada") + (pn.marca ? " · " + esc(pn.marca) : "") + '</span><div class="chips">' +
       '<span class="selo st-' + esc(pn.status) + '" style="font-size:15px;padding:4px 12px">' + esc(textoStatus(pn)) + "</span>" +
-      '<span class="chip">Série ' + esc(pn.serie || "—") + "</span>" + (textoRecap(pn.recapagens) ? '<span class="chip">' + esc(textoRecap(pn.recapagens)) + "</span>" : "") +
+      '<span class="chip">Série ' + esc(pn.serie || "—") + "</span>" + (pn.dot ? '<span class="chip">DOT ' + esc(pn.dot) + "</span>" : "") + (textoRecap(pn.recapagens) ? '<span class="chip">' + esc(textoRecap(pn.recapagens)) + "</span>" : "") +
       (pn.criadoEm ? '<span class="chip">Cadastrado em ' + esc(fmtData(hojeISO(new Date(pn.criadoEm)))) + (pn.criadoPor ? " por " + esc(pn.criadoPor.nome) : "") + "</span>" : "") + "</div></div>";
     const evs = (pn.eventos || []).slice().reverse();
     const lista = evs.length ? '<div class="ficha-eventos">' + evs.map((ev) => "<div><time>" + esc(fmtDataHora(ev.data)) + "</time><span>" + esc(ev.texto) + "</span>" +
@@ -1018,7 +1172,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
       const [de, ate] = intervalo();
       const filtrados = regs.filter((r) => (!de || String(r.dataServico) >= de) && (!ate || String(r.dataServico) <= ate) && bateBusca(r, q));
       const nCham = agruparChamados(filtrados).length;
-      $("#resumo-ctrl").textContent = plural(nCham, "chamado", "chamados") + " · " + plural(filtrados.length, "pneu trocado", "pneus trocados") +
+      const nCons = filtrados.filter((r) => r.servico === "conserto").length;
+      $("#resumo-ctrl").textContent = plural(nCham, "chamado", "chamados") + " · " + plural(filtrados.length - nCons, "pneu trocado", "pneus trocados") + (nCons ? " · " + plural(nCons, "conserto no local", "consertos no local") : "") +
         (de || ate ? " · " + (de ? fmtData(de) : "início") + " a " + (ate ? fmtData(ate) : "hoje") : " · todo o período");
       box.innerHTML = filtrados.length ? htmlDias(filtrados, true) : '<div class="vazio">Nenhuma troca nesse período' + (q ? " com essa busca" : "") + ".<br>Escolha outro período ou toque em “Tudo”.</div>";
       return;
@@ -1048,11 +1203,13 @@ function conectarFirebase(aoConectar, aoFalhar) {
   $("#b-voltar-lista").addEventListener("click", () => { pneuAberto = null; tagAberta = null; $("#ctrl-lista").hidden = false; $("#ctrl-detalhe").hidden = true; renderCtrl(); });
 
   function textoSaiu(sa) {
+    if (sa && sa.condicao === "Maciço") return '<span class="selo recap">Maciço</span>';
     if (!sa || (sa.recapagens === null || sa.recapagens === undefined) && !sa.condicao) return "";
     const n = sa.recapagens || 0;
     return '<span class="selo recap">' + (n ? n + "ª recapagem" : "0 recapagem") + "</span>";
   }
   function textoCondicao(en) {
+    if (en && en.condicao === "Maciço") return '<span class="selo recap">Maciço</span>';
     if (en.condicao === "Novo") return '<span class="selo novo">Novo</span>';
     return '<span class="selo recap">Recapado' + (en.recapagens ? " · " + en.recapagens + "ª recapagem" : "") + "</span>";
   }
@@ -1113,12 +1270,12 @@ function conectarFirebase(aoConectar, aoFalhar) {
     catch (e) { btn.disabled = false; msg.innerHTML = '<div class="pendencias">Não foi possível carregar o gerador de Excel. Abra o app com internet uma vez e tente de novo.</div>'; return; }
     try {
       const chamados = agruparChamados(regs).sort((a, b) => String(a[0].dataHora).localeCompare(String(b[0].dataHora)));
-      const idCham = new Map(); chamados.forEach((g, k) => idCham.set(g[0].chamadoId || g[0]._id, k + 1));
+      const idCham = new Map(); chamados.forEach((g, k) => idCham.set(chaveCham(g[0]), k + 1));
       const eqInfo = (r) => equip.find((x) => x.tag === r.tag) || r.equipamento || {};
 
       /* aba 1: uma linha por pneu trocado */
       const trocas = regs.map((r) => {
-        const e = eqInfo(r), p = r.posicao || {}, sa = r.saiu || {}, en = r.entrou || {};
+        const e = eqInfo(r), p = r.posicao || {}, sa = r.saiu || {}, en = r.servico === "conserto" ? {} : (r.entrou || {});
         return {
           "Data": dataExcel(r.dataServico),
           "Hora entrada": r.horaServico || "",
@@ -1126,19 +1283,20 @@ function conectarFirebase(aoConectar, aoFalhar) {
           "Hora saída": (r.fim && r.fim.hora) || "",
           "Duração (h:mm)": horasMin(r.duracaoMin),
           "Duração (min)": typeof r.duracaoMin === "number" ? r.duracaoMin : "",
-          "Nº chamado": idCham.get(r.chamadoId || r._id) || "",
+          "Nº chamado": idCham.get(chaveCham(r)) || "",
           "OM / nota": r.om || "",
           "TAG equipamento": r.tag || "",
           "Descrição do equipamento": e.descricao || "",
           "Família": e.familia || "",
           "Área": e.area || "",
           "Local de instalação (SAP)": e.local || "",
-          "KM / Horímetro": r.leitura ? (r.leitura.unidade === "H" ? "Horímetro" : "KM") : "",
+          "KM / Horímetro": r.leitura ? (r.leitura.unidade === "H" ? "Horímetro" : "KM") : (r.semLeitura ? "Sem horímetro" : ""),
           "Leitura": r.leitura ? Number(r.leitura.valor) : "",
           "Borracheiro": (r.borracheiro && r.borracheiro.nome) || "",
           "Matrícula": (r.borracheiro && r.borracheiro.matricula) || "",
           "Pneu do chamado": r.pneuNumero || 1,
           "Pneus no chamado": r.totalPneus || 1,
+          "Serviço": r.servico === "conserto" ? "Conserto no local" : "Troca",
           "Eixo": p.eixo ?? "",
           "Lado": p.lado || "",
           "Posição": p.posicao || "",
@@ -1165,14 +1323,18 @@ function conectarFirebase(aoConectar, aoFalhar) {
       /* aba 2: um chamado por linha */
       const linhasCham = chamados.map((g, k) => {
         const r = g[0], e = eqInfo(r);
+        const subs = {}; g.forEach((x) => { subs[(x.chamadoId || x._id) + "|" + x.dataHora] = x; });
+        const lanc = Object.values(subs).sort((a, b) => String(a.dataHora).localeCompare(String(b.dataHora)));
+        const durTot = lanc.reduce((s, x) => s + (typeof x.duracaoMin === "number" ? x.duracaoMin : 0), 0);
+        const ultimo = lanc[lanc.length - 1];
         const motivos = {}; g.forEach((x) => { const m = txtMotivo(x) + (txtDefeito(x) ? " (" + txtDefeito(x) + ")" : ""); motivos[m] = (motivos[m] || 0) + 1; });
         return {
           "Nº chamado": k + 1,
-          "Data": dataExcel(r.dataServico),
-          "Hora entrada": r.horaServico || "",
-          "Hora saída": (r.fim && r.fim.hora) || "",
-          "Duração (h:mm)": horasMin(r.duracaoMin),
-          "Duração (min)": typeof r.duracaoMin === "number" ? r.duracaoMin : "",
+          "Data": dataExcel(lanc[0].dataServico),
+          "Hora entrada": lanc[0].horaServico || "",
+          "Hora saída": (ultimo.fim && ultimo.fim.hora) || "",
+          "Duração (h:mm)": horasMin(durTot),
+          "Duração (min)": durTot,
           "OM / nota": r.om || "",
           "TAG equipamento": r.tag || "",
           "Descrição do equipamento": e.descricao || "",
@@ -1180,12 +1342,15 @@ function conectarFirebase(aoConectar, aoFalhar) {
           "Área": e.area || "",
           "Borracheiro": (r.borracheiro && r.borracheiro.nome) || "",
           "Matrícula": (r.borracheiro && r.borracheiro.matricula) || "",
-          "Pneus trocados": g.length,
+          "Pneus (total)": g.length,
+          "Trocas": g.filter((x) => x.servico !== "conserto").length,
+          "Consertos no local": g.filter((x) => x.servico === "conserto").length,
+          "Lançamentos no tablet": lanc.length,
           "Posições": g.map((x) => txtPos(x.posicao)).join(" | "),
           "Motivos": Object.entries(motivos).map(([m, n]) => (n > 1 ? n + "x " : "") + m).join(" | "),
-          "Pneus novos montados": g.filter((x) => x.entrou && Number(x.entrou.recapagens) === 0).length,
-          "Pneus recapados montados": g.filter((x) => x.entrou && Number(x.entrou.recapagens) > 0).length,
-          "KM / Horímetro": r.leitura ? (r.leitura.unidade === "H" ? "Horímetro" : "KM") : "",
+          "Pneus novos montados": g.filter((x) => x.servico !== "conserto" && x.entrou && x.entrou.recapagens !== null && Number(x.entrou.recapagens) === 0).length,
+          "Pneus recapados montados": g.filter((x) => x.servico !== "conserto" && x.entrou && Number(x.entrou.recapagens) > 0).length,
+          "KM / Horímetro": r.leitura ? (r.leitura.unidade === "H" ? "Horímetro" : "KM") : (r.semLeitura ? "Sem horímetro" : ""),
           "Leitura": r.leitura ? Number(r.leitura.valor) : "",
           "Observações": r.observacoes || ""
         };
@@ -1195,7 +1360,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
       const porEq = new Map();
       regs.forEach((r) => {
         if (!porEq.has(r.tag)) porEq.set(r.tag, { rs: [], ch: new Set() });
-        const o = porEq.get(r.tag); o.rs.push(r); o.ch.add(r.chamadoId || r._id);
+        const o = porEq.get(r.tag); o.rs.push(r); o.ch.add(chaveCham(r));
       });
       const linhasEq = Array.from(porEq.entries()).map(([tag, o]) => {
         const e = equip.find((x) => x.tag === tag) || o.rs[0].equipamento || {};
@@ -1204,21 +1369,24 @@ function conectarFirebase(aoConectar, aoFalhar) {
         const minTot = Object.values(durCham).reduce((s, v) => s + v, 0);
         return {
           "TAG equipamento": tag, "Descrição": e.descricao || "", "Família": e.familia || "", "Área": e.area || "",
-          "Chamados": o.ch.size, "Pneus trocados": o.rs.length,
+          "Chamados": o.ch.size, "Pneus trocados": o.rs.filter((x) => x.servico !== "conserto").length,
+          "Consertos no local": o.rs.filter((x) => x.servico === "conserto").length,
           "Furado": o.rs.filter((x) => x.motivo === "Pneu furado").length,
           "Careca": o.rs.filter((x) => x.motivo === "Pneu careca").length,
           "Com defeito": o.rs.filter((x) => x.motivo === "Pneu com defeito").length,
           "Estourado": o.rs.filter((x) => x.motivo === "Pneu estourado").length,
+          "Fim de vida": o.rs.filter((x) => x.motivo === "Fim de vida").length,
+          "Roda/aro danificado": o.rs.filter((x) => x.motivo === "Roda/aro danificado").length,
           "Outro": o.rs.filter((x) => x.motivo === "Outro").length,
           "Tempo total (h:mm)": horasMin(minTot),
           "Primeira troca": dataExcel(datas[0]), "Última troca": dataExcel(datas[datas.length - 1])
         };
-      }).sort((a, b) => b["Pneus trocados"] - a["Pneus trocados"]);
+      }).sort((a, b) => (b["Pneus trocados"] + b["Consertos no local"]) - (a["Pneus trocados"] + a["Consertos no local"]));
 
       /* aba 4: por motivo/defeito */
       const porMot = {};
-      regs.forEach((r) => { const k = txtMotivo(r) + "|" + (txtDefeito(r) || (r.motivo === "Outro" ? r.motivoTexto || "" : "")); porMot[k] = (porMot[k] || 0) + 1; });
-      const linhasMot = Object.entries(porMot).map(([k, n]) => { const [m, d] = k.split("|"); return { "Motivo": m, "Detalhe": d, "Pneus": n, "% do total": Math.round((n / regs.length) * 1000) / 10 }; })
+      regs.forEach((r) => { const k = (r.servico === "conserto" ? "Conserto no local" : "Troca") + "|" + txtMotivo(r) + "|" + (txtDefeito(r) || (r.motivo === "Outro" ? r.motivoTexto || "" : "")); porMot[k] = (porMot[k] || 0) + 1; });
+      const linhasMot = Object.entries(porMot).map(([k, n]) => { const [s, m, d] = k.split("|"); return { "Serviço": s, "Motivo": m, "Detalhe": d, "Pneus": n, "% do total": Math.round((n / regs.length) * 1000) / 10 }; })
         .sort((a, b) => b["Pneus"] - a["Pneus"]);
 
       /* aba 5: por borracheiro */
@@ -1236,7 +1404,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
       /* aba 6: por destino do pneu que saiu e por condição do que entrou */
       const contar = (f) => { const o = {}; regs.forEach((r) => { const k = f(r); if (k !== "") o[k] = (o[k] || 0) + 1; }); return o; };
       const dest = contar((r) => (r.saiu && r.saiu.destino) || "Não informado");
-      const recE = contar((r) => (r.entrou && r.entrou.recapagens !== undefined && r.entrou.recapagens !== null ? (Number(r.entrou.recapagens) === 0 ? "Novo (0)" : r.entrou.recapagens + "ª recapagem") : "Não informado"));
+      const recE = contar((r) => (r.servico === "conserto" ? "" : r.entrou && r.entrou.condicao === "Maciço" ? "Maciço" : r.entrou && r.entrou.recapagens !== undefined && r.entrou.recapagens !== null ? (Number(r.entrou.recapagens) === 0 ? "Novo (0)" : r.entrou.recapagens + "ª recapagem") : "Não informado"));
       const linhasPneus = [
         ...Object.entries(dest).map(([k, n]) => ({ "Grupo": "Destino do pneu que saiu", "Item": k, "Pneus": n })),
         ...Object.entries(recE).sort().map(([k, n]) => ({ "Grupo": "Pneu que entrou", "Item": k, "Pneus": n }))
@@ -1247,7 +1415,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
         { "Campo": "Período", "Valor": (de ? fmtData(de) : "início") + " a " + (ate ? fmtData(ate) : "hoje") },
         { "Campo": "Filtro de busca", "Valor": $("#i-busca-ctrl").value.trim() || "nenhum" },
         { "Campo": "Chamados", "Valor": chamados.length },
-        { "Campo": "Pneus trocados", "Valor": regs.length },
+        { "Campo": "Pneus atendidos (trocas + consertos)", "Valor": regs.length },
         { "Campo": "Equipamentos atendidos", "Valor": porEq.size },
         { "Campo": "Gerado em", "Valor": fmtDataHora(new Date().toISOString()) }
       ];
@@ -1258,7 +1426,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
         const evs = pn.eventos || [];
         return {
           "Marcação": pn.tag || "", "Nº do pneu": String(pn.tag || "").slice(0, 3), "Código do tipo": t.codigo || "", "Tipo": t.medida || pn.medida || "",
-          "Nº de série": pn.serie || "", "Marca": pn.marca || "", "Recapagens": pn.recapagens ?? "",
+          "Nº de série": pn.serie || "", "DOT": pn.dot || "", "Marca": pn.marca || "", "Recapagens": pn.recapagens ?? "",
           "Situação": NOME_STATUS[pn.status] || pn.status || "",
           "Equipamento atual": pn.status === "montado" ? l.equipTag || "" : "", "Descrição do equipamento": pn.status === "montado" ? l.equipDesc || "" : "",
           "Eixo": pn.status === "montado" ? l.eixo ?? "" : "", "Lado": pn.status === "montado" ? l.lado || "" : "", "Posição": pn.status === "montado" ? l.posicao || "" : "",
@@ -1279,6 +1447,26 @@ function conectarFirebase(aoConectar, aoFalhar) {
         "No conserto": porTipo[c].conserto, "Sucata": porTipo[c].sucata, "Números usados": porTipo[c].total, "Números livres": Math.max(0, 1000 - porTipo[c].total)
       }));
       info.push({ "Campo": "Pneus cadastrados (todos)", "Valor": pneusCad.length });
+      info.splice(5, 0, { "Campo": "Trocas de pneu", "Valor": regs.filter((r) => r.servico !== "conserto").length },
+        { "Campo": "Consertos no local", "Valor": regs.filter((r) => r.servico === "conserto").length });
+      /* recapagens no período (pela vida de cada pneu marcado) */
+      const linhasRecap = [];
+      pneusCad.forEach((pn) => (pn.eventos || []).forEach((ev) => {
+        const d = ev.data ? hojeISO(new Date(ev.data)) : "";
+        if ((de && d < de) || (ate && d > ate)) return;
+        let mov = null, antes = "", depois = "";
+        const txt = String(ev.texto || "");
+        if (ev.tipo === "volta_recapagem") { mov = "Voltou da recapagem"; antes = ev.de ?? ""; depois = ev.para ?? ""; }
+        else if (ev.tipo === "enviado_recapagem" || /→ Recapagem/.test(txt) || /→ Na recapagem/.test(txt)) mov = "Enviado para recapagem";
+        else { const m = /recapagens (\d+|\?) → (\d+)/.exec(txt); if (m && /Na recapagem →/.test(txt)) { mov = "Voltou da recapagem"; antes = m[1]; depois = m[2]; } }
+        if (!mov) return;
+        const t = TIPOS_MAP[pn.tipo] || tipoDe(pn.tag) || {};
+        linhasRecap.push({ "Data": dataExcel(d), "Movimento": mov, "Marcação": pn.tag || "", "Tipo": t.codigo ? nomeTipo(t.codigo) : (pn.medida || ""), "Nº de série": pn.serie || "",
+          "Recapagens antes": antes === "?" ? "" : antes, "Recapagens depois": depois, "Detalhe": txt, "Borracheiro": ev.por || "", "OM": ev.om || "" });
+      }));
+      linhasRecap.sort((a, b) => (a["Data"] && b["Data"] ? a["Data"] - b["Data"] : 0));
+      info.push({ "Campo": "Pneus enviados para recapagem (período)", "Valor": linhasRecap.filter((x) => x["Movimento"] === "Enviado para recapagem").length },
+        { "Campo": "Pneus que voltaram da recapagem (período)", "Valor": linhasRecap.filter((x) => x["Movimento"] === "Voltou da recapagem").length });
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, folha(XLSX, trocas, [11, 9, 11, 9, 9, 8, 9, 12, 14, 34, 20, 18, 14, 11, 10, 20, 10, 8, 8, 6, 10, 9, 16, 14, 10, 12, 16, 14, 16, 12, 10, 18, 20, 18, 30, 18, 14]), "Trocas (por pneu)");
@@ -1287,6 +1475,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
       XLSX.utils.book_append_sheet(wb, folha(XLSX, linhasMot, [20, 26, 8, 10]), "Por motivo");
       XLSX.utils.book_append_sheet(wb, folha(XLSX, linhasB, [22, 10, 9, 10, 12, 14]), "Por borracheiro");
       XLSX.utils.book_append_sheet(wb, folha(XLSX, linhasPneus, [26, 22, 8]), "Pneus (destino e condição)");
+      XLSX.utils.book_append_sheet(wb, folha(XLSX, linhasRecap, [11, 22, 10, 30, 16, 10, 10, 60, 20, 12]), "Recapagens no período");
       XLSX.utils.book_append_sheet(wb, folha(XLSX, linhasTipo, [8, 28, 10, 10, 10, 10, 10, 10, 8, 10, 10]), "Estoque por tipo");
       XLSX.utils.book_append_sheet(wb, folha(XLSX, linhasPneusCad, [10, 8, 8, 28, 16, 14, 10, 16, 14, 30, 6, 10, 10, 16, 18, 50, 16, 10]), "Pneus cadastrados");
       XLSX.utils.book_append_sheet(wb, folha(XLSX, info, [26, 44]), "Info");
