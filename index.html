@@ -145,6 +145,11 @@ select.campo{font-size:17px}
 .corrigir-bts{display:flex;gap:10px;flex-wrap:wrap}
 .corrigir-erro{color:#b3261e;margin:0;font-size:15px}
 .correcao-nota{background:#fff6d6;color:#5a4500;border-radius:10px;padding:8px 12px;margin:0 0 10px;font-size:15px}
+
+/* v22 */
+.btn-semserie{margin-top:8px;min-height:44px;padding:4px 16px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--muted);font:600 15px/1 var(--f-corpo);cursor:pointer}
+.btn-semserie[aria-pressed="true"]{background:var(--amarelo);color:var(--amarelo-ink);border-color:var(--amarelo)}
+#om-outro .tag-erro{margin-top:10px}
 </style>
 </head>
 <body>
@@ -408,6 +413,7 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
       <h3>2. Dados do chamado</h3>
       <label class="rotulo" for="i-om">Nº OM / nota <span class="opc">(9 números)</span></label>
       <input class="campo" id="i-om" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="ex.: 110563177">
+      <div id="om-outro"></div>
       <div id="om-junta"></div>
       <span class="rotulo">KM / horímetro <span class="opc">(digite a leitura do painel ou marque “Sem horímetro”)</span></span>
       <div class="grade-2">
@@ -470,6 +476,7 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
         <h3>Cadastrar pneu e gerar TAG</h3>
         <label class="rotulo" for="c-serie">Nº de série</label>
         <input class="campo" id="c-serie" autocomplete="off">
+        <button class="btn-semserie" id="c-semserie" aria-pressed="false" type="button">Pneu sem nº de série</button>
         <label class="rotulo" for="c-dot">DOT <span class="opc">(opcional: semana e ano, 4 números, ex.: 5025)</span></label>
         <input class="campo" id="c-dot" inputmode="numeric" maxlength="4" autocomplete="off">
         <span class="rotulo">Tipo de pneu <span class="opc">(código da legenda)</span></span>
@@ -618,7 +625,7 @@ textarea.campo{min-height:90px;font-size:18px;resize:vertical}
   </form>
 </div>
 
-<script type="module" src="app.js?v=21"></script>
+<script type="module" src="app.js?v=22"></script>
 <script>
 if ("serviceWorker" in navigator) {
   const tinhaVersao = !!navigator.serviceWorker.controller;

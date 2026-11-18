@@ -302,7 +302,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
 
   function novoFormulario() {
     F = { equipamento: null, unidade: null, juntar: null, naoJuntar: false, avisosOk: false };
-    $("#om-junta").innerHTML = ""; $("#i-leitura").disabled = false;
+    $("#om-junta").innerHTML = ""; $("#om-outro").innerHTML = ""; F.omOutro = null; $("#i-leitura").disabled = false;
     pneus = [novoPneu()];
     historicoTag = [];
     ["#i-tag", "#i-leitura", "#i-om", "#i-obs"].forEach((s) => ($(s).value = ""));
@@ -335,9 +335,26 @@ function conectarFirebase(aoConectar, aoFalhar) {
   $("#t-registro").addEventListener("input", () => { F.avisosOk = false; });
 
   /* mesma OM no mesmo equipamento: junta no mesmo chamado */
+  let omConsulta = 0;
+  async function checarOMOutros(om) {
+    F.omOutro = null;
+    if (!F.equipamento || !/^\d{9}$/.test(om)) return;
+    const meu = F.equipamento.tag, id = ++omConsulta;
+    const achar = (lista) => lista.filter((r) => r && String(r.om || "").replace(/\D/g, "") === om && r.tag && r.tag !== meu)
+      .sort((a, b) => String(b.dataHora).localeCompare(String(a.dataHora)))[0] || null;
+    let outro = achar(fila.filter((f) => !f.col).map((f) => f.data).concat(registrosCtrl));
+    if (!outro && db && navigator.onLine) {
+      try { const snap = await db.collection("registros").where("om", "==", om).get(); outro = achar(snap.docs.map((d) => d.data())); } catch (e) {}
+    }
+    if (id !== omConsulta || !F.equipamento || F.equipamento.tag !== meu || $("#i-om").value.replace(/\D/g, "") !== om) return;
+    F.omOutro = outro ? { tag: outro.tag, data: outro.dataServico, por: (outro.borracheiro && outro.borracheiro.nome) || "" } : null;
+    const box = $("#om-outro");
+    if (box) box.innerHTML = F.omOutro ? '<div class="tag-erro">A OM ' + esc(om) + " já foi usada no equipamento <b>" + esc(F.omOutro.tag) + "</b> (" + esc(fmtData(F.omOutro.data)) + (F.omOutro.por ? ", " + esc(F.omOutro.por) : "") + "). Uma OM é de um equipamento só: confira o número.</div>" : "";
+  }
   function verificarOM() {
     const box = $("#om-junta"); F.juntar = null;
     const om = $("#i-om").value.replace(/\D/g, "");
+    checarOMOutros(om);
     if (!F.equipamento || om.length < 9) { box.innerHTML = ""; return; }
     const iguais = historicoTag.filter((r) => String(r.om || "").replace(/\D/g, "") === om && r.tag === F.equipamento.tag && r.chamadoId)
       .sort((a, b) => String(b.dataHora).localeCompare(String(a.dataHora)));
@@ -385,6 +402,11 @@ function conectarFirebase(aoConectar, aoFalhar) {
       TIPOS.map((t) => '<option value="' + t.codigo + '"' + (sel === t.codigo ? " selected" : "") + ">" + esc(t.codigo + " · " + t.medida) + "</option>").join("") +
       '<option value="outra"' + (sel === "outra" ? " selected" : "") + ">Outra medida (fora da legenda)</option></select>" +
       (sel === "outra" ? entrada("medida", p.medida, "Outra medida", ' placeholder="Escreva a medida" style="margin-top:8px"') : "");
+  }
+  function campoSerie(p, lado) {
+    const sem = !!p[lado + "SemSerie"];
+    return entrada(lado + "Serie", sem ? "" : p[lado + "Serie"], "Nº de série", sem ? ' disabled placeholder="Pneu sem nº de série"' : "") +
+      '<button class="btn-semserie" data-acao="semserie" data-lado="' + lado + '" aria-pressed="' + sem + '">' + (sem ? "✓ Pneu sem nº de série" : "Pneu sem nº de série") + "</button>";
   }
   function entrada(campo, valor, rotulo, extra) {
     return '<input class="campo" data-pinput="' + campo + '" value="' + esc(valor) + '" autocomplete="off" aria-label="' + esc(rotulo) + '"' + (extra || "") + ">";
@@ -435,10 +457,10 @@ function conectarFirebase(aoConectar, aoFalhar) {
     p[lado + "TagAplicada"] = tag;
     const rec = pn.recapagens === undefined || pn.recapagens === null ? null : String(pn.recapagens);
     if (lado === "saiu") {
-      if (pn.serie) p.saiuSerie = pn.serie;
+      if (pn.serie) { p.saiuSerie = pn.serie; p.saiuSemSerie = false; } else if (pn.semSerie) { p.saiuSerie = ""; p.saiuSemSerie = true; }
       if (rec !== null) { p.saiuRecapagens = rec; p.saiuCondicao = rec === "0" ? "Sem recapagem" : "Recapado"; }
     } else {
-      if (pn.serie) p.entrouSerie = pn.serie;
+      if (pn.serie) { p.entrouSerie = pn.serie; p.entrouSemSerie = false; } else if (pn.semSerie) { p.entrouSerie = ""; p.entrouSemSerie = true; }
       const tpE = tipoDe(tag);
       if (tpE) { p.medidaTipo = tpE.codigo; p.medida = tpE.medida; } else if (pn.medida) { p.medidaTipo = "outra"; p.medida = pn.medida; }
       let r2 = rec;
@@ -462,12 +484,12 @@ function conectarFirebase(aoConectar, aoFalhar) {
         (conserto ? '<path d="M5 12.5l4.5 4.5L19 7.5"/>' : '<path d="M12 5v14M5 12l7 7 7-7"/>') + "</svg>" + (conserto ? "Pneu consertado" : "Pneu que saiu") + "</h4>" +
         '<span class="rotulo">Marcação do pneu <span class="opc">(nº + tipo)</span></span>' + entrada("saiuTag", p.saiuTag, conserto ? "Marcação do pneu consertado" : "Marcação do pneu que saiu", ' placeholder="ex.: 001 275" inputmode="numeric"') +
         '<div class="tag-status" data-tagstatus="saiu">' + htmlTagStatus(p, "saiu") + "</div>" +
-        '<span class="rotulo">Nº de série</span>' + entrada("saiuSerie", p.saiuSerie, "Nº de série") + recSaiu +
+        '<span class="rotulo">Nº de série</span>' + campoSerie(p, "saiu") + recSaiu +
         (conserto ? "" : '<span class="rotulo">Destino</span>' + grupo("destino", p.destino)) + "</section>";
     const blocoEntrou = conserto ? "" : '<section class="entrou"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Pneu que entrou</h4>' +
         '<span class="rotulo">Marcação do pneu <span class="opc">(nº + tipo)</span></span>' + entrada("entrouTag", p.entrouTag, "Marcação do pneu que entrou", ' placeholder="ex.: 001 275" inputmode="numeric"') +
         '<div class="tag-status" data-tagstatus="entrou">' + htmlTagStatus(p, "entrou") + "</div>" +
-        '<span class="rotulo">Nº de série</span>' + entrada("entrouSerie", p.entrouSerie, "Nº de série do pneu que entrou") +
+        '<span class="rotulo">Nº de série</span>' + campoSerie(p, "entrou") +
         '<span class="rotulo">Tipo de pneu (medida)</span>' + htmlMedida(p) + recEntrou + "</section>";
     return '<article class="pneu" id="pneu-' + i + '" data-idx="' + i + '">' +
       '<header class="pneu-cab"><h4>Pneu ' + (i + 1) + "</h4>" + (conserto ? '<span class="servico-tag">Conserto no local</span>' : "") + '<span class="resumo-pos">' + esc(textoPosicao(p)) + "</span>" +
@@ -493,6 +515,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const card = e.target.closest(".pneu"); if (!card) return;
     const i = +card.dataset.idx, p = pneus[i];
     if (e.target.closest('[data-acao="remover"]')) { pneus.splice(i, 1); renderPneus(); return; }
+    const ss = e.target.closest('[data-acao="semserie"]');
+    if (ss) { const l = ss.dataset.lado; p[l + "SemSerie"] = !p[l + "SemSerie"]; if (p[l + "SemSerie"]) p[l + "Serie"] = ""; F.avisosOk = false; card.classList.remove("falta"); renderPneu(i); return; }
     const ger = e.target.closest('[data-acao="gerar"]');
     if (ger) {
       const lado = ger.dataset.lado, cod = p[lado + "TipoSel"];
@@ -631,6 +655,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const om = $("#i-om").value.trim();
     if (!om) add("#c-chamado", "Nº da OM / nota");
     else if (!/^\d{9}$/.test(om)) add("#c-chamado", "A OM deve ter 9 números, sem espaço nem letra (ex.: 110563177)");
+    else if (F.omOutro) add("#c-chamado", "A OM " + om + " já foi usada no equipamento " + F.omOutro.tag + " (" + fmtData(F.omOutro.data) + "). Uma OM é de um equipamento só: confira o número");
     const leitura = $("#i-leitura").value.trim();
     if (!F.unidade) add("#c-chamado", "KM / horímetro: digite a leitura ou marque “Sem horímetro”");
     else if (F.unidade !== "SEM") {
@@ -654,7 +679,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
       if (!ts) add(alvo, n + "marcação do " + nomeS + ": 6 números (se não tiver, gere uma nova)");
       else if (!tipoDe(ts)) add(alvo, n + "o código de tipo da marcação " + ts + " (" + nomeS + ") não existe");
       else if (!pneuPorTag(ts) && p.saiuTagNova !== ts) add(alvo, n + "o pneu " + ts + " (" + nomeS + ") não está cadastrado");
-      if (!p.saiuSerie.trim()) add(alvo, n + "nº de série do " + nomeS);
+      if (!p.saiuSerie.trim() && !p.saiuSemSerie) add(alvo, n + "nº de série do " + nomeS + " (se o pneu não tem, toque em “Pneu sem nº de série”)");
       if (!macicoSaiu(p) && (p.saiuRecapagens === null || p.saiuRecapagens === undefined)) add(alvo, n + "recapagens do " + nomeS + " (0 se nunca foi recapado)");
       if (!conserto) {
         if (!te) add(alvo, n + "marcação do pneu que entrou: 6 números (se não tiver, gere uma nova)");
@@ -662,26 +687,21 @@ function conectarFirebase(aoConectar, aoFalhar) {
         else if (!pneuPorTag(te) && p.entrouTagNova !== te) add(alvo, n + "o pneu " + te + " (que entrou) não está cadastrado");
         if (ts && ts === te) add(alvo, n + "o pneu que saiu e o que entrou estão com a mesma marcação");
         if (!p.destino) add(alvo, n + "destino do pneu que saiu");
-        if (!p.entrouSerie.trim()) add(alvo, n + "nº de série do pneu que entrou");
+        if (!p.entrouSerie.trim() && !p.entrouSemSerie) add(alvo, n + "nº de série do pneu que entrou (se o pneu não tem, toque em “Pneu sem nº de série”)");
         if (!p.medidaTipo || (p.medidaTipo === "outra" && !String(p.medida || "").trim())) add(alvo, n + "tipo (medida) do pneu que entrou");
         if (!macicoEntrou(p) && (p.recapagens === null || p.recapagens === undefined)) add(alvo, n + "recapagens do pneu que entrou (0 se é novo)");
-        if (p.saiuSerie.trim() && norm(p.saiuSerie) === norm(p.entrouSerie)) add(alvo, n + "o pneu que saiu e o que entrou estão com o mesmo nº de série (se é o mesmo pneu consertado, escolha “Conserto no local”)");
         const pnE = te && pneuPorTag(te);
         if (pnE && pnE.status === "montado" && pnE.local) {
           const ondeE = pnE.local.equipTag + " (eixo " + pnE.local.eixo + " " + String(pnE.local.lado || "").toLowerCase() + (pnE.local.posicao ? " " + String(pnE.local.posicao).toLowerCase() : "") + ")";
           if (F.equipamento && pnE.local.equipTag !== F.equipamento.tag) add(alvo, n + "o pneu " + te + " (que entrou) está montado em " + ondeE + ". Um pneu não pode estar em dois equipamentos: confira o número marcado no pneu. Se ele não tiver marcação, gere uma nova");
-          else avisa(alvo, n + "o pneu " + te + " (que entrou) já está montado neste equipamento, em " + ondeE + ". É um rodízio?");
+          else add(alvo, n + "o pneu " + te + " (que entrou) já está montado neste equipamento, em " + ondeE + ". Confira o número marcado no pneu. Se ele não tiver marcação, gere uma nova");
         }
-        if (SERIE_SUSPEITA(p.entrouSerie)) avisa(alvo, n + "a série “" + p.entrouSerie.trim() + "” (pneu que entrou) parece incompleta");
-        const outroE = p.entrouSerie.trim() && pneuPorSerie(p.entrouSerie);
-        if (outroE && outroE.tag !== te) avisa(alvo, n + "a série " + p.entrouSerie.trim().toUpperCase() + " já é do pneu " + outroE.tag + " (" + textoStatus(outroE) + "). Se for o mesmo pneu, use a marcação " + outroE.tag);
+        if (SERIE_SUSPEITA(p.entrouSerie)) avisa(alvo, n + "a série “" + p.entrouSerie.trim() + "” (pneu que entrou) parece incompleta. Se o pneu não tem série, toque em “Pneu sem nº de série”");
       }
       const pnS = ts && p.saiuTagNova !== ts && pneuPorTag(ts);
       if (pnS && F.equipamento && !soCadastro(pnS) && !(pnS.status === "montado" && pnS.local && pnS.local.equipTag === F.equipamento.tag))
         avisa(alvo, n + "pelo sistema, o pneu " + ts + " (" + nomeS + ") não está neste equipamento: " + (textoStatus(pnS) || "sem situação") + ". Confira o número marcado no pneu. Se ele não tiver marcação, gere uma nova");
-      if (SERIE_SUSPEITA(p.saiuSerie)) avisa(alvo, n + "a série “" + p.saiuSerie.trim() + "” (" + nomeS + ") parece incompleta");
-      const outroS = p.saiuSerie.trim() && pneuPorSerie(p.saiuSerie);
-      if (outroS && outroS.tag !== ts && p.saiuTagNova === ts) avisa(alvo, n + "a série " + p.saiuSerie.trim().toUpperCase() + " já é do pneu " + outroS.tag + ". Se for o mesmo pneu, use a marcação " + outroS.tag + " em vez da nova");
+      if (SERIE_SUSPEITA(p.saiuSerie)) avisa(alvo, n + "a série “" + p.saiuSerie.trim() + "” (" + nomeS + ") parece incompleta. Se o pneu não tem série, toque em “Pneu sem nº de série”");
       [ts, te].forEach((t) => { if (!t) return; if (tagsUsadas[t] !== undefined && tagsUsadas[t] !== k) add(alvo, n + "a marcação " + t + " já foi usada no pneu " + (tagsUsadas[t] + 1)); else tagsUsadas[t] = k; });
       if (!p.motivo) add(alvo, n + (conserto ? "o que foi consertado" : "motivo da troca"));
       if (!conserto && p.motivo === "Pneu com defeito" && !p.defeito) add(alvo, n + "qual defeito");
@@ -691,8 +711,6 @@ function conectarFirebase(aoConectar, aoFalhar) {
         if (posUsadas[chave] !== undefined) add(alvo, n + "mesma posição do pneu " + (posUsadas[chave] + 1));
         else posUsadas[chave] = k;
       }
-      const se = conserto ? "" : norm(p.entrouSerie);
-      if (se) { if (seriesEntrou[se] !== undefined) add(alvo, n + "mesmo nº de série que entrou no pneu " + (seriesEntrou[se] + 1)); else seriesEntrou[se] = k; }
     });
     const ini = lerDataHora("ini"), fim = lerDataHora("fim");
     if (!ini) add("#c-hora", "Digite a hora de entrada (quando o serviço começou)");
@@ -754,17 +772,17 @@ function conectarFirebase(aoConectar, aoFalhar) {
       const precisaTexto = p.motivo === "Outro" || (!conserto && p.motivo === "Pneu com defeito" && p.defeito === "Outro");
       const ts = normTag(p.saiuTag), te = normTag(p.entrouTag);
       const mS = macicoSaiu(p), mE = macicoEntrou(p);
-      const saiu = { serie: p.saiuSerie.trim().toUpperCase(), tagPneu: ts, tagNova: p.saiuTagNova === ts, destino: conserto ? "Conserto no local" : p.destino,
+      const saiu = { serie: p.saiuSemSerie ? "" : p.saiuSerie.trim().toUpperCase(), semSerie: !!p.saiuSemSerie, tagPneu: ts, tagNova: p.saiuTagNova === ts, destino: conserto ? "Conserto no local" : p.destino,
         condicao: mS ? "Maciço" : p.saiuCondicao, recapagens: mS ? null : Number(p.saiuRecapagens) };
       let entrou;
       if (conserto) {
         const tp = tipoDe(ts), pn = pneuPorTag(ts);
-        entrou = { serie: saiu.serie, tagPneu: ts, tagNova: false, medida: (tp && tp.medida) || (pn && pn.medida) || "", tipo: tp ? tp.codigo : null,
+        entrou = { serie: saiu.serie, semSerie: saiu.semSerie, tagPneu: ts, tagNova: false, medida: (tp && tp.medida) || (pn && pn.medida) || "", tipo: tp ? tp.codigo : null,
           condicao: mS ? "Maciço" : (Number(p.saiuRecapagens) === 0 ? "Novo" : "Recapado"), recapagens: saiu.recapagens, mesmoPneu: true };
       } else {
         const medida = p.medidaTipo === "outra" ? String(p.medida || "").trim().toUpperCase() : TIPOS_MAP[p.medidaTipo].medida;
         if (!med.includes(medida)) med.unshift(medida);
-        entrou = { serie: p.entrouSerie.trim().toUpperCase(), tagPneu: te, tagNova: p.entrouTagNova === te, medida, tipo: p.medidaTipo !== "outra" ? p.medidaTipo : null,
+        entrou = { serie: p.entrouSemSerie ? "" : p.entrouSerie.trim().toUpperCase(), semSerie: !!p.entrouSemSerie, tagPneu: te, tagNova: p.entrouTagNova === te, medida, tipo: p.medidaTipo !== "outra" ? p.medidaTipo : null,
           condicao: mE ? "Maciço" : p.condicao, recapagens: mE ? null : Number(p.recapagens) };
       }
       return Object.assign({}, comum, {
@@ -789,14 +807,14 @@ function conectarFirebase(aoConectar, aoFalhar) {
       const velhoS = pneuPorTag(r.saiu.tagPneu);
       const tS = tipoDe(r.saiu.tagPneu);
       if (r.servico === "conserto") {
-        const d = { tag: r.saiu.tagPneu, serie: r.saiu.serie, recapagens: r.saiu.recapagens, status: "montado", local, atualizadoEm: agora,
+        const d = { tag: r.saiu.tagPneu, serie: r.saiu.serie || (velhoS && velhoS.serie) || "", semSerie: !!r.saiu.semSerie, recapagens: r.saiu.recapagens, status: "montado", local, atualizadoEm: agora,
           eventos: comEvento(velhoS, evento("Consertado no local em " + r.tag + " (" + pos + ") · " + motivoTxt, { om: r.om, tipo: "conserto", reg: r._rid, antes: fotoAntes(velhoS) })) };
         if (!velhoS) { d.criadoEm = agora; d.criadoPor = { matricula: usuario.matricula, nome: usuario.nome }; }
         if (tS) { d.tipo = tS.codigo; if (!velhoS || !velhoS.medida) d.medida = tS.medida; }
         filaPneu(r.saiu.tagPneu, d);
         return;
       }
-      const dS = { tag: r.saiu.tagPneu, serie: r.saiu.serie, recapagens: r.saiu.recapagens, status: STATUS_DESTINO[r.saiu.destino] || "patio", local: null, atualizadoEm: agora,
+      const dS = { tag: r.saiu.tagPneu, serie: r.saiu.serie || (velhoS && velhoS.serie) || "", semSerie: !!r.saiu.semSerie, recapagens: r.saiu.recapagens, status: STATUS_DESTINO[r.saiu.destino] || "patio", local: null, atualizadoEm: agora,
         eventos: comEvento(velhoS, evento("Saiu de " + r.tag + " (" + pos + ") → " + r.saiu.destino + " · " + motivoTxt,
           { om: r.om, tipo: r.saiu.destino === "Recapagem" ? "enviado_recapagem" : "saida", reg: r._rid, antes: fotoAntes(velhoS) })) };
       if (!velhoS) { dS.criadoEm = agora; dS.criadoPor = { matricula: usuario.matricula, nome: usuario.nome }; }
@@ -806,7 +824,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
       const velhoE = pneuPorTag(r.entrou.tagPneu);
       const voltou = velhoE && velhoE.status === "recapagem";
       const txtE = (voltou ? "Voltou da recapagem (" + (velhoE.recapagens ?? "?") + " → " + (r.entrou.recapagens ?? "?") + ") e foi montado em " : "Montado em ") + r.tag + " (" + pos + ")";
-      const dE = { tag: r.entrou.tagPneu, serie: r.entrou.serie, medida: r.entrou.medida, recapagens: r.entrou.recapagens, status: "montado", local, atualizadoEm: agora,
+      const dE = { tag: r.entrou.tagPneu, serie: r.entrou.serie || (velhoE && velhoE.serie) || "", semSerie: !!r.entrou.semSerie, medida: r.entrou.medida, recapagens: r.entrou.recapagens, status: "montado", local, atualizadoEm: agora,
         eventos: comEvento(velhoE, evento(txtE, Object.assign({ om: r.om, tipo: voltou ? "volta_recapagem" : "montagem", reg: r._rid, antes: fotoAntes(velhoE) }, voltou ? { de: velhoE.recapagens ?? null, para: r.entrou.recapagens } : {}))) };
       if (!velhoE) { dE.criadoEm = agora; dE.criadoPor = { matricula: usuario.matricula, nome: usuario.nome }; }
       const tE = tipoDe(r.entrou.tagPneu); if (tE) dE.tipo = tE.codigo;
@@ -882,7 +900,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
   function novoCadastro(manterLote) {
     const lote = manterLote ? { tipo: C.tipo, marca: $("#c-marca").value, recap: C.recap, situacao: C.situacao } : {};
     C = { tipo: lote.tipo || null, recap: lote.recap ?? null, situacao: lote.situacao || "estoque" };
-    $("#c-serie").value = ""; $("#c-dot").value = ""; $("#c-marca").value = lote.marca || "";
+    $("#c-serie").value = ""; $("#c-serie").disabled = false; $("#c-semserie").setAttribute("aria-pressed", "false"); $("#c-semserie").textContent = "Pneu sem nº de série"; $("#c-dot").value = ""; $("#c-marca").value = lote.marca || "";
     marcar("#c-tipo", C.tipo); marcar("#c-recap", C.recap); marcar("#c-situacao", C.situacao); aplicarMacicoCad();
     $("#pend-cad").innerHTML = ""; $("#c-cad").classList.remove("falta");
   }
@@ -890,7 +908,8 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const faltas = [];
     const serie = $("#c-serie").value.trim().toUpperCase();
     const tipo = C.tipo && TIPOS_MAP[C.tipo], medida = tipo ? tipo.medida : "";
-    if (!serie) faltas.push("Nº de série");
+    const semSerie = $("#c-semserie").getAttribute("aria-pressed") === "true";
+    if (!serie && !semSerie) faltas.push("Nº de série (se o pneu não tem, toque em “Pneu sem nº de série”)");
     if (!tipo) faltas.push("Tipo de pneu");
     const macico = EH_MACICO(C.tipo);
     if (!macico && (C.recap === null || C.recap === undefined)) faltas.push("Recapagens (0 se for novo)");
@@ -902,8 +921,6 @@ function conectarFirebase(aoConectar, aoFalhar) {
       return;
     }
     const avisosCad = [];
-    const dup = pneuPorSerie(serie);
-    if (dup) avisosCad.push("Já existe o pneu " + dup.tag + " com a série " + serie + (dup.dot ? " (DOT " + dup.dot + ")" : "") + " · " + textoStatus(dup) + ". Se for o mesmo pneu, use a aba “Pneu com TAG”.");
     if (SERIE_SUSPEITA(serie)) avisosCad.push("A série “" + serie + "” parece incompleta. Confira no pneu.");
     if (avisosCad.length && C.confirmaDup !== serie) {
       C.confirmaDup = serie;
@@ -921,7 +938,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
     const agora = new Date().toISOString();
     const marca = $("#c-marca").value.trim();
     const recap = macico ? null : Number(C.recap);
-    filaPneu(tag, { tag, tipo: tipo.codigo, serie, dot, medida, marca, recapagens: recap, status: C.situacao, local: null, criadoEm: agora, atualizadoEm: agora,
+    filaPneu(tag, { tag, tipo: tipo.codigo, serie: semSerie ? "" : serie, semSerie, dot, medida, marca, recapagens: recap, status: C.situacao, local: null, criadoEm: agora, atualizadoEm: agora,
       criadoPor: { matricula: usuario.matricula, nome: usuario.nome },
       eventos: [evento("Cadastrado · " + (NOME_STATUS[C.situacao] || C.situacao) + " · " + (macico ? "maciço" : recap === 0 ? "novo" : recap + "ª recapagem") + (dot ? " · DOT " + dot : ""), { tipo: "cadastro" })] });
     C.confirmaDup = null;
@@ -930,12 +947,18 @@ function conectarFirebase(aoConectar, aoFalhar) {
     atualizarStatus(); enviarFila();
     $("#tg-tag").textContent = tag;
     $("#tg-tipo").textContent = "Pneu nº " + tag.slice(0, 3) + " · tipo " + nomeTipo(tipo.codigo);
-    $("#tg-resumo").textContent = "Série " + serie + (dot ? " · DOT " + dot : "") + (marca ? " · " + marca : "") + " · " + (macico ? "maciço" : recap === 0 ? "novo" : recap + "ª recapagem") + " · " + NOME_STATUS[C.situacao] + "." +
+    $("#tg-resumo").textContent = (semSerie ? "Sem nº de série" : "Série " + serie) + (dot ? " · DOT " + dot : "") + (marca ? " · " + marca : "") + " · " + (macico ? "maciço" : recap === 0 ? "novo" : recap + "ª recapagem") + " · " + NOME_STATUS[C.situacao] + "." +
       (navigator.onLine && db ? "" : " Sem conexão agora: o cadastro sobe sozinho quando a internet voltar.");
     ir("tag");
   });
   $("#b-cad-outro").addEventListener("click", () => { novoCadastro(true); modoPneus("novo"); ir("pneus"); setTimeout(() => $("#c-serie").focus(), 50); });
   $("#c-serie").addEventListener("input", () => { C.confirmaDup = null; });
+  $("#c-semserie").addEventListener("click", () => {
+    const b = $("#c-semserie"), sem = b.getAttribute("aria-pressed") !== "true";
+    b.setAttribute("aria-pressed", String(sem)); b.textContent = sem ? "✓ Pneu sem nº de série" : "Pneu sem nº de série";
+    $("#c-serie").disabled = sem; if (sem) $("#c-serie").value = "";
+    $("#c-cad").classList.remove("falta");
+  });
   $("#b-cad-sair").addEventListener("click", () => { usuario = null; ir("inicio"); });
   $("#b-sair-pneus").addEventListener("click", () => { usuario = null; ir("inicio"); });
 
