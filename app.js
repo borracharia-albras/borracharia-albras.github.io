@@ -136,6 +136,9 @@ function conectarFirebase(aoConectar, aoFalhar) {
     return todosPneus().find((p) => norm(p.serie) === s) || null;
   }
   const NOME_STATUS = { estoque: "Estoque (novo)", patio: "Pátio (usado)", montado: "Montado", recapagem: "Na recapagem", conserto: "No conserto", sucata: "Sucata" };
+  /* pneu que só foi cadastrado (marcado agora) e ainda não teve nenhum lançamento */
+  const soCadastro = (pn) => !!pn && (pn.status === "patio" || pn.status === "estoque") &&
+    (pn.eventos || []).every((e) => e.tipo === "cadastro" || /^Cadastrado/.test(String(e.texto || "")));
   function textoStatus(pn) {
     if (!pn) return "";
     if (pn.status === "montado" && pn.local) return "Montado em " + pn.local.equipTag + " · eixo " + pn.local.eixo + " " + String(pn.local.lado || "").toLowerCase() + (pn.local.posicao ? " " + pn.local.posicao.toLowerCase() : "");
@@ -420,10 +423,11 @@ function conectarFirebase(aoConectar, aoFalhar) {
     if (lado === "entrou" && pn.status === "montado") aviso = "O sistema mostra este pneu já montado (" + textoStatus(pn) + "). Confira a TAG.";
     if (lado === "entrou" && pn.status === "recapagem") aviso = "Voltou da recapagem: marcado como " + (Math.min(10, (Number(pn.recapagens) || 0) + 1)) + "ª recapagem. Confira e corrija nos botões de recapagem se precisar.";
     if (lado === "entrou" && pn.status === "sucata") aviso = "O sistema mostra este pneu como sucata. Confira a TAG.";
-    if (lado === "saiu" && pn.status !== "montado") aviso = "O sistema mostra este pneu como “" + (NOME_STATUS[pn.status] || "?") + "”, não montado. Confira a TAG.";
+    const novoMarcado = lado === "saiu" && soCadastro(pn);
+    if (lado === "saiu" && pn.status !== "montado" && !novoMarcado) aviso = "O sistema mostra este pneu como “" + (NOME_STATUS[pn.status] || "?") + "”, não montado. Confira a TAG.";
     if (lado === "saiu" && pn.status === "montado" && pn.local && F.equipamento && pn.local.equipTag !== F.equipamento.tag) aviso = "O sistema mostra este pneu em outro equipamento (" + pn.local.equipTag + "). Confira a TAG.";
     return '<div class="tag-ok"><b>' + esc(tag) + "</b> · série " + esc(pn.serie || "—") + (pn.medida ? " · " + esc(pn.medida) : "") + (textoRecap(pn.recapagens) ? " · " + esc(textoRecap(pn.recapagens)) : "") +
-      "<small>" + esc(textoStatus(pn)) + "</small></div>" + (aviso ? '<div class="tag-aviso">' + esc(aviso) + "</div>" : "");
+      "<small>" + esc(novoMarcado ? "Marcado agora, ainda sem lançamento: vai ficar registrado como saindo deste equipamento" : textoStatus(pn)) + "</small></div>" + (aviso ? '<div class="tag-aviso">' + esc(aviso) + "</div>" : "");
   }
   function aplicarPneu(p, lado, tag) {
     const pn = pneuPorTag(tag); if (!pn) return false;
@@ -673,7 +677,7 @@ function conectarFirebase(aoConectar, aoFalhar) {
         if (outroE && outroE.tag !== te) avisa(alvo, n + "a série " + p.entrouSerie.trim().toUpperCase() + " já é do pneu " + outroE.tag + " (" + textoStatus(outroE) + "). Se for o mesmo pneu, use a marcação " + outroE.tag);
       }
       const pnS = ts && p.saiuTagNova !== ts && pneuPorTag(ts);
-      if (pnS && F.equipamento && !(pnS.status === "montado" && pnS.local && pnS.local.equipTag === F.equipamento.tag))
+      if (pnS && F.equipamento && !soCadastro(pnS) && !(pnS.status === "montado" && pnS.local && pnS.local.equipTag === F.equipamento.tag))
         avisa(alvo, n + "pelo sistema, o pneu " + ts + " (" + nomeS + ") não está neste equipamento: " + (textoStatus(pnS) || "sem situação") + ". Confira o número marcado no pneu. Se ele não tiver marcação, gere uma nova");
       if (SERIE_SUSPEITA(p.saiuSerie)) avisa(alvo, n + "a série “" + p.saiuSerie.trim() + "” (" + nomeS + ") parece incompleta");
       const outroS = p.saiuSerie.trim() && pneuPorSerie(p.saiuSerie);
